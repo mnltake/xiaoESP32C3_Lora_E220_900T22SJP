@@ -58,7 +58,7 @@ void LoRaRecvTask(void *pvParameters) {
       SerialMon.printf("\n");
       SerialMon.printf("hex dump:\n");
       for (int i = 0; i < data.recv_data_len; i++) {
-        SerialMon.printf("%02x ", data.recv_data[i]);
+        SerialMon.printf("%02d ", data.recv_data[i]);
       }
       SerialMon.printf("\n");
       SerialMon.printf("RSSI: %d dBm\n", data.rssi);
@@ -72,10 +72,14 @@ void LoRaRecvTask(void *pvParameters) {
 }
 
 void LoRaSendTask(void *pvParameters) {
-  int c=0xFF;
+  char c=0xFF;
+
   while (1) {
     char msg[200] = {0};
-    msg[0]=c--;
+    // msg[0] = 0x00;
+    msg[0] = c--;
+    msg[1] = config.own_address>>8;
+    msg[2] = config.own_address&0xff;
 
     // ESP32がコンソールから読み込む
     // ReadDataFromConsole(msg, (sizeof(msg) / sizeof(msg[0])));
@@ -90,7 +94,7 @@ void LoRaSendTask(void *pvParameters) {
 
     SerialMon.flush();
 
-    delay(1000);
+    delay(2000);
   }
 }
 

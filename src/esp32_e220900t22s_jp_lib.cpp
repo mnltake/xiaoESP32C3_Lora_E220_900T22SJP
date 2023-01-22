@@ -256,7 +256,7 @@ void CLoRa::SwitchToConfigurationMode(void) {
 
 void CLoRa::SetDefaultConfigValue(struct LoRaConfigItem_t &config) {
   const LoRaConfigItem_t default_config = {
-      0x0000, // own_address 0
+      0x0102, // own_address 0
       0b011, // baud_rate 9600 bps
       0b10000, // air_data_rate SF:9 BW:125
       0b11, // subpacket_size 200
@@ -265,11 +265,11 @@ void CLoRa::SetDefaultConfigValue(struct LoRaConfigItem_t &config) {
       0b01, // transmitting_power 13 dBm
       0x00, // own_channel 0
       0b1, // rssi_byte_flag 有効
-      0b0, // transmission_method_type トランスペアレント送信モード(default)
+      0b1, // transmission_method_type トランスペアレント送信モード(default)
       0b0, // lbt_flag 有効
       0b011, // wor_cycle 2000 ms
       0x0000, // encryption_key 0
-      0x0000, // target_address 0
+      0xFFFF, // target_address 0
       0x00}; // target_channel 0
 
   config = default_config;

@@ -3,7 +3,8 @@
 #include <FS.h>
 // #include <SD.h>
 // #include <SPI.h>
-
+#define LED0 D0
+#define LED1 D1
 CLoRa lora;
 struct LoRaConfigItem_t config;
 struct RecvFrameE220900T22SJP_t data;
@@ -18,7 +19,8 @@ void setup() {
   SerialMon.begin(9600);
   delay(1000); // SerialMon init wait
   SerialMon.println();
-
+  pinMode( LED0 ,OUTPUT);
+  pinMode( LED1 ,OUTPUT);
   // LoRa設定値の読み込み
   
   if (lora.LoadConfigSetting(CONFIG_FILENAME, config)) {
@@ -51,6 +53,7 @@ void loop() {
 void LoRaRecvTask(void *pvParameters) {
   while (1) {
     if (lora.RecieveFrame(&data) == 0) {
+      digitalWrite(LED1 ,HIGH);
       SerialMon.printf("from ATOM recv data:\n");
       for (int i = 0; i < data.recv_data_len; i++) {
         SerialMon.printf("%02x", data.recv_data[i]);
@@ -65,6 +68,7 @@ void LoRaRecvTask(void *pvParameters) {
       SerialMon.printf("\n");
 
       SerialMon.flush();
+      digitalWrite(LED1 ,LOW);
     }
 
     delay(1);
@@ -84,6 +88,7 @@ void LoRaSendTask(void *pvParameters) {
     // ESP32がコンソールから読み込む
     // ReadDataFromConsole(msg, (sizeof(msg) / sizeof(msg[0])));
     SerialMon.printf("I send data\n");
+    digitalWrite(LED0 ,HIGH);
     if (lora.SendFrame(config, (uint8_t *)msg, strlen(msg)) == 0) {
       SerialMon.printf("send succeeded.\n");
       SerialMon.printf("\n");
@@ -93,7 +98,7 @@ void LoRaSendTask(void *pvParameters) {
     }
 
     SerialMon.flush();
-
+    digitalWrite(LED0 ,LOW);
     delay(2000);
   }
 }

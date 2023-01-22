@@ -259,7 +259,7 @@ void CLoRa::SetDefaultConfigValue(struct LoRaConfigItem_t &config) {
       0x0000, // own_address 0
       0b011, // baud_rate 9600 bps
       0b10000, // air_data_rate SF:9 BW:125
-      0b00, // subpacket_size 200
+      0b11, // subpacket_size 200
       0b1, // rssi_ambient_noise_flag 有効
       0b0, // transmission_pause_flag 有効
       0b01, // transmitting_power 13 dBm

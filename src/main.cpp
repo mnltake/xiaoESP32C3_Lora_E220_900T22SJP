@@ -5,6 +5,8 @@
 // #include <SPI.h>
 #define LED0 D0
 #define LED1 D1
+const int sleepSec = 30;
+RTC_DATA_ATTR char bootCount = 0x01;
 CLoRa lora;
 struct LoRaConfigItem_t config;
 struct RecvFrameE220900T22SJP_t data;
@@ -14,6 +16,25 @@ void LoRaRecvTask(void *pvParameters);
 void LoRaSendTask(void *pvParameters);
 void ReadDataFromConsole(char *msg, int max_msg_len);
 
+//WDT
+#include "esp_system.h"
+
+const int wdtTimeout = 30*1000;  //time in ms to trigger the watchdog
+hw_timer_t *timer = NULL;
+
+void ARDUINO_ISR_ATTR resetModule() {
+  ets_printf("reboot\n");
+  // esp_restart();
+}
+
+void deep_sleep(){
+        SerialMon.printf("sleep \n");
+        bootCount++;
+        lora.SwitchToConfigurationMode();
+        delay(2000);
+        esp_sleep_enable_timer_wakeup(sleepSec * 1000 * 1000);
+      	esp_deep_sleep_start();
+}
 void setup() {
   // put your setup code here, to run once:
   SerialMon.begin(9600);
@@ -38,6 +59,10 @@ void setup() {
   // ノーマルモード(M0=0,M1=0)へ移行する
   lora.SwitchToNormalMode();
 
+  // timer = timerBegin(0, 80, true);                  //timer 0, div 80
+  // timerAttachInterrupt(timer, &resetModule, true);  //attach callback
+  // timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
+  // timerAlarmEnable(timer);                          //enable interrupt
   // マルチタスク
   xTaskCreateUniversal(LoRaRecvTask, "LoRaRecvTask", 8192, NULL, 1, NULL,
                        0);
@@ -47,7 +72,8 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  delay(1000);
+  delay(10000);
+  // deep_sleep();
 }
 
 void LoRaRecvTask(void *pvParameters) {
@@ -61,7 +87,7 @@ void LoRaRecvTask(void *pvParameters) {
       SerialMon.printf("\n");
       SerialMon.printf("hex dump:\n");
       for (int i = 0; i < data.recv_data_len; i++) {
-        SerialMon.printf("%02d ", data.recv_data[i]);
+        SerialMon.printf("%02x ", data.recv_data[i]);
       }
       SerialMon.printf("\n");
       SerialMon.printf("RSSI: %d dBm\n", data.rssi);
@@ -69,6 +95,10 @@ void LoRaRecvTask(void *pvParameters) {
 
       SerialMon.flush();
       digitalWrite(LED1 ,LOW);
+      if ((data.recv_data[4]<<8 |data.recv_data[5]) == config.own_address){
+        SerialMon.printf("response ok \n");
+        deep_sleep();
+      }
     }
 
     delay(1);
@@ -76,21 +106,23 @@ void LoRaRecvTask(void *pvParameters) {
 }
 
 void LoRaSendTask(void *pvParameters) {
-  char c=0xFF;
+   char c=0x00;
 
   while (1) {
     char msg[200] = {0};
     // msg[0] = 0x00;
-    msg[0] = c--;
+    msg[0] = bootCount;
     msg[1] = config.own_address>>8;
     msg[2] = config.own_address&0xff;
+    msg[3] = 0x0A;
+    msg[4] = 0x0d;
+// SerialMon.printf("%04x",config.own_address);
 
-    // ESP32がコンソールから読み込む
-    // ReadDataFromConsole(msg, (sizeof(msg) / sizeof(msg[0])));
     SerialMon.printf("I send data\n");
     digitalWrite(LED0 ,HIGH);
     if (lora.SendFrame(config, (uint8_t *)msg, strlen(msg)) == 0) {
       SerialMon.printf("send succeeded.\n");
+      digitalWrite(LED0 ,LOW);
       SerialMon.printf("\n");
     } else {
       SerialMon.printf("send failed.\n");
@@ -98,35 +130,8 @@ void LoRaSendTask(void *pvParameters) {
     }
 
     SerialMon.flush();
-    digitalWrite(LED0 ,LOW);
+    
+    
     delay(2000);
-  }
-}
-
-void ReadDataFromConsole(char *msg, int max_msg_len) {
-  int len = 0;
-  char *start_p = msg;
-
-  while (len < max_msg_len) {
-    if (SerialMon.available() > 0) {
-      char incoming_byte = SerialMon.read();
-      if (incoming_byte == 0x00 || incoming_byte > 0x7F)
-        continue;
-      *(start_p + len) = incoming_byte;
-      // 最短で3文字(1文字 + CR LF)
-      if (incoming_byte == 0x0a && len >= 2 && (*(start_p + len - 1)) == 0x0d) {
-        break;
-      }
-      len++;
-    }
-    delay(1);
-  }
-
-  // msgからCR LFを削除
-  len = strlen(msg);
-  for (int i = 0; i < len; i++) {
-    if (msg[i] == 0x0D || msg[i] == 0x0A) {
-      msg[i] = '\0';
-    }
   }
 }

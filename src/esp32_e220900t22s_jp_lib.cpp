@@ -191,10 +191,10 @@ int CLoRa::SendFrame(struct LoRaConfigItem_t &config, uint8_t *send_data,
 #if 1 /* print debug */
   for (int i = 0; i < 3 + size; i++) {
     if (i < 3) {
-      SerialMon.printf("%02x", frame[i]);
+      SerialMon.printf("%02x ", frame[i]);
     } else {
       // SerialMon.printf("%c", frame[i]);
-      SerialMon.printf("%02x", frame[i]);
+      SerialMon.printf("%02x ", frame[i]);
     }
   }
   SerialMon.printf("\n");

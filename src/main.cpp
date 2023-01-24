@@ -6,7 +6,7 @@
 #define LED0 D0
 #define LED1 D1
 const int sleepSec = 30;
-RTC_DATA_ATTR char bootCount = 0x01;
+RTC_DATA_ATTR uint16_t bootCount = 254;
 CLoRa lora;
 struct LoRaConfigItem_t config;
 struct RecvFrameE220900T22SJP_t data;
@@ -19,6 +19,22 @@ void ReadDataFromConsole(char *msg, int max_msg_len);
 //WDT
 #include "esp_system.h"
 
+
+//DS18B20
+#include <OneWire.h>
+#include <DallasTemperature.h>
+OneWire oneWire(D2);
+DallasTemperature sensors(&oneWire);
+
+struct msgStruct{ 
+  uint16_t bootcount;
+  uint16_t myadress;
+  float temp;
+  uint16_t end = 0x0a0d;
+} msg;
+
+
+
 const int wdtTimeout = 30*1000;  //time in ms to trigger the watchdog
 hw_timer_t *timer = NULL;
 
@@ -26,7 +42,12 @@ void ARDUINO_ISR_ATTR resetModule() {
   ets_printf("reboot\n");
   // esp_restart();
 }
-
+float getTemp(){
+  sensors.requestTemperatures(); 
+  Serial.print("Temperature:");
+  Serial.println(sensors.getTempCByIndex(0));
+  return sensors.getTempCByIndex(0);
+}
 void deep_sleep(){
         SerialMon.printf("sleep \n");
         bootCount++;
@@ -44,6 +65,7 @@ void setup() {
   SerialMon.println("start");
   pinMode( LED0 ,OUTPUT);
   pinMode( LED1 ,OUTPUT);
+  sensors.begin();
   // LoRa設定値の読み込み
   
   if (lora.LoadConfigSetting(CONFIG_FILENAME, config)) {
@@ -115,19 +137,36 @@ void LoRaSendTask(void *pvParameters) {
 
   while (1) {
     // lora.SwitchToNormalMode();
-    delay(200);
-    char msg[32] = {0};
-    // msg[0] = 0x00;
-    msg[0] = bootCount;
-    msg[1] = config.own_address>>8;
-    msg[2] = config.own_address&0xff;
-    msg[3] = 0x0A;
-    msg[4] = 0x0d;
+    msg.bootcount = bootCount;
+    msg.myadress = config.own_address;
+    msg.temp = getTemp();
+
+
+    // union ByteFloatUnion{
+    //   uint8_t byteformat[4];
+    //   float floatformat;
+    // } temp;
+  
+    // temp.floatformat = getTemp();
+    // delay(200);
+    // char  msg[32] = {0};
+    // // msg[0] = 0x00;
+    // msg[0] = bootCount;
+    // msg[1] = config.own_address>>8;
+    // msg[2] = config.own_address&0xff;
+    // msg[3] = 0x0A;
+    // msg[4] = 0x0d;
+    // msg[5] = temp.byteformat[0];
+    // msg[6] = temp.byteformat[1];
+    // msg[7] = temp.byteformat[2];
+    // msg[8] = temp.byteformat[3];
+    // msg[9] = 0x0A;
+    // msg[10] = 0x0d;
 // SerialMon.printf("%04x",config.own_address);
     SerialLoRa.flush();
     SerialMon.printf("I send data\n");
     digitalWrite(LED0 ,HIGH);
-    if (lora.SendFrame(config, (uint8_t *)msg, strlen(msg)) == 0) {
+    if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
       delay(500);
       SerialMon.printf("send succeeded.\n");
       digitalWrite(LED0 ,LOW);
@@ -140,6 +179,6 @@ void LoRaSendTask(void *pvParameters) {
     // SerialMon.flush();
     // lora.SwitchToConfigurationMode();
     
-    delay(10000);
+    delay(30000);
   }
 }

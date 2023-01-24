@@ -31,15 +31,17 @@ void deep_sleep(){
         SerialMon.printf("sleep \n");
         bootCount++;
         lora.SwitchToConfigurationMode();
-        delay(2000);
+        delay(3000);
+        digitalWrite(LED0 ,LOW);
+        digitalWrite(LED1 ,LOW);
         esp_sleep_enable_timer_wakeup(sleepSec * 1000 * 1000);
       	esp_deep_sleep_start();
 }
 void setup() {
   // put your setup code here, to run once:
   SerialMon.begin(9600);
-  delay(1000); // SerialMon init wait
-  SerialMon.println();
+  delay(2000); // SerialMon init wait
+  SerialMon.println("start");
   pinMode( LED0 ,OUTPUT);
   pinMode( LED1 ,OUTPUT);
   // LoRa設定値の読み込み
@@ -65,7 +67,7 @@ void setup() {
   // timerAlarmEnable(timer);                          //enable interrupt
   // マルチタスク
   xTaskCreateUniversal(LoRaRecvTask, "LoRaRecvTask", 8192, NULL, 1, NULL,
-                       0);
+                       1);
   xTaskCreateUniversal(LoRaSendTask, "LoRaSendTask", 8192, NULL, 1, NULL,
                        1);
 }
@@ -73,13 +75,15 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   delay(10000);
-  // deep_sleep();
+  deep_sleep();
 }
 
 void LoRaRecvTask(void *pvParameters) {
   while (1) {
     if (lora.RecieveFrame(&data) == 0) {
       digitalWrite(LED1 ,HIGH);
+      delay(500);
+      digitalWrite(LED1 ,LOW);
       SerialMon.printf("from ATOM recv data:\n");
       for (int i = 0; i < data.recv_data_len; i++) {
         SerialMon.printf("%02x", data.recv_data[i]);
@@ -94,9 +98,10 @@ void LoRaRecvTask(void *pvParameters) {
       SerialMon.printf("\n");
 
       SerialMon.flush();
-      digitalWrite(LED1 ,LOW);
+      
       if ((data.recv_data[4]<<8 |data.recv_data[5]) == config.own_address){
         SerialMon.printf("response ok \n");
+        delay(100);
         deep_sleep();
       }
     }
@@ -109,7 +114,9 @@ void LoRaSendTask(void *pvParameters) {
    char c=0x00;
 
   while (1) {
-    char msg[200] = {0};
+    // lora.SwitchToNormalMode();
+    delay(200);
+    char msg[32] = {0};
     // msg[0] = 0x00;
     msg[0] = bootCount;
     msg[1] = config.own_address>>8;
@@ -117,10 +124,11 @@ void LoRaSendTask(void *pvParameters) {
     msg[3] = 0x0A;
     msg[4] = 0x0d;
 // SerialMon.printf("%04x",config.own_address);
-
+    SerialLoRa.flush();
     SerialMon.printf("I send data\n");
     digitalWrite(LED0 ,HIGH);
     if (lora.SendFrame(config, (uint8_t *)msg, strlen(msg)) == 0) {
+      delay(500);
       SerialMon.printf("send succeeded.\n");
       digitalWrite(LED0 ,LOW);
       SerialMon.printf("\n");
@@ -129,9 +137,9 @@ void LoRaSendTask(void *pvParameters) {
       SerialMon.printf("\n");
     }
 
-    SerialMon.flush();
+    // SerialMon.flush();
+    // lora.SwitchToConfigurationMode();
     
-    
-    delay(2000);
+    delay(10000);
   }
 }

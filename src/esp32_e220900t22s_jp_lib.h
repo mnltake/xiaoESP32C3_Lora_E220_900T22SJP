@@ -14,10 +14,10 @@
 
 // E220-900T22S(JP)へのピンアサイン
 #define LoRa_ModeSettingPin_M0 D6
-#define LoRa_ModeSettingPin_M1 D5
-#define LoRa_Rx_ESP_TxPin D4
-#define LoRa_Tx_ESP_RxPin D3
-#define LoRa_AUXPin D2
+#define LoRa_ModeSettingPin_M1 D7
+#define LoRa_Rx_ESP_TxPin D8
+#define LoRa_Tx_ESP_RxPin D9
+#define LoRa_AUXPin D10
 
 // E220-900T22S(JP)のbaud rate
 #define LoRa_BaudRate 9600

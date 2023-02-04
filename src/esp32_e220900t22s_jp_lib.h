@@ -13,7 +13,7 @@
 #define CONFIG_FILENAME "/e220900t22s_jp_lora_config.ini"
 
 // E220-900T22S(JP)へのピンアサイン
-#define LoRa_ModeSettingPin_M0 D6
+#define LoRa_ModeSettingPin_M0 D7
 #define LoRa_ModeSettingPin_M1 D7
 #define LoRa_Rx_ESP_TxPin D8
 #define LoRa_Tx_ESP_RxPin D9

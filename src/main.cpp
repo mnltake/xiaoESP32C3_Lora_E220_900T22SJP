@@ -5,8 +5,11 @@
 // #include <SPI.h>
 #define LED0 D0
 #define LED1 D1
+#define SENSOR_GND D5
+#define SENSOR_3V3 D6
+#define SENSOR_DQ D3
 const int sleepSec = 30;
-RTC_DATA_ATTR uint16_t bootCount = 254;
+RTC_DATA_ATTR uint16_t bootCount = 1;
 CLoRa lora;
 struct LoRaConfigItem_t config;
 struct RecvFrameE220900T22SJP_t data;
@@ -23,13 +26,13 @@ void ReadDataFromConsole(char *msg, int max_msg_len);
 //DS18B20
 #include <OneWire.h>
 #include <DallasTemperature.h>
-OneWire oneWire(D2);
+OneWire oneWire(SENSOR_DQ);
 DallasTemperature sensors(&oneWire);
 
 struct msgStruct{ 
   uint16_t bootcount;
-  uint16_t myadress;
-  float temp;
+  uint16_t myadress ;
+  float temp  ; 
   uint16_t end = 0x0a0d;
 } msg;
 
@@ -43,6 +46,8 @@ void ARDUINO_ISR_ATTR resetModule() {
   // esp_restart();
 }
 float getTemp(){
+  digitalWrite (SENSOR_3V3 ,HIGH);
+  delay(10);
   sensors.requestTemperatures(); 
   Serial.print("Temperature:");
   Serial.println(sensors.getTempCByIndex(0));
@@ -65,6 +70,9 @@ void setup() {
   SerialMon.println("start");
   pinMode( LED0 ,OUTPUT);
   pinMode( LED1 ,OUTPUT);
+  pinMode( SENSOR_3V3 ,OUTPUT);
+  pinMode( SENSOR_GND ,OUTPUT);
+  digitalWrite ( SENSOR_GND ,LOW);
   sensors.begin();
   // LoRa設定値の読み込み
   
@@ -88,8 +96,8 @@ void setup() {
   // timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
   // timerAlarmEnable(timer);                          //enable interrupt
   // マルチタスク
-  xTaskCreateUniversal(LoRaRecvTask, "LoRaRecvTask", 8192, NULL, 1, NULL,
-                       1);
+  // xTaskCreateUniversal(LoRaRecvTask, "LoRaRecvTask", 8192, NULL, 1, NULL,
+  //                      1);
   xTaskCreateUniversal(LoRaSendTask, "LoRaSendTask", 8192, NULL, 1, NULL,
                        1);
 }
@@ -133,8 +141,6 @@ void LoRaRecvTask(void *pvParameters) {
 }
 
 void LoRaSendTask(void *pvParameters) {
-   char c=0x00;
-
   while (1) {
     // lora.SwitchToNormalMode();
     msg.bootcount = bootCount;
@@ -180,5 +186,6 @@ void LoRaSendTask(void *pvParameters) {
     // lora.SwitchToConfigurationMode();
     
     delay(30000);
+    deep_sleep();
   }
 }

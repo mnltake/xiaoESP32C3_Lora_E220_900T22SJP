@@ -1,15 +1,14 @@
 #include "esp32_e220900t22s_jp_lib.h"
 #include <Arduino.h>
 #include <FS.h>
-// #include <SD.h>
-// #include <SPI.h>
+
 #define LED0 D0
 #define LED1 D1
 #define SENSOR_GND D5
 #define SENSOR_3V3 D6
 #define SENSOR_DQ D3
-const int sleepSec = 30;
-RTC_DATA_ATTR uint16_t bootCount = 1;
+const int sleepSec = 60 - 5;//実行時間5ｓ
+RTC_DATA_ATTR uint16_t bootCount = 0;
 CLoRa lora;
 struct LoRaConfigItem_t config;
 struct RecvFrameE220900T22SJP_t data;
@@ -36,15 +35,9 @@ struct msgStruct{
   uint16_t end = 0x0a0d;
 } msg;
 
-
-
 const int wdtTimeout = 30*1000;  //time in ms to trigger the watchdog
 hw_timer_t *timer = NULL;
 
-void ARDUINO_ISR_ATTR resetModule() {
-  ets_printf("reboot\n");
-  // esp_restart();
-}
 float getTemp(){
   digitalWrite (SENSOR_3V3 ,HIGH);
   delay(10);
@@ -53,23 +46,27 @@ float getTemp(){
   Serial.println(sensors.getTempCByIndex(0));
   return sensors.getTempCByIndex(0);
 }
-void deep_sleep(){
+
+void IRAM_ATTR deep_sleep(){
         SerialMon.printf("sleep \n");
-        bootCount++;
         lora.SwitchToConfigurationMode();
-        delay(3000);
-        digitalWrite(LED0 ,LOW);
-        digitalWrite(LED1 ,LOW);
+        if (!bootCount){
+          delay(10000);
+        } 
+        bootCount++;
+        // digitalWrite(LED0 ,LOW);
+        // digitalWrite(LED1 ,LOW);
         esp_sleep_enable_timer_wakeup(sleepSec * 1000 * 1000);
       	esp_deep_sleep_start();
 }
+
 void setup() {
   // put your setup code here, to run once:
   SerialMon.begin(9600);
   delay(2000); // SerialMon init wait
   SerialMon.println("start");
-  pinMode( LED0 ,OUTPUT);
-  pinMode( LED1 ,OUTPUT);
+  // pinMode( LED0 ,OUTPUT);
+  // pinMode( LED1 ,OUTPUT);
   pinMode( SENSOR_3V3 ,OUTPUT);
   pinMode( SENSOR_GND ,OUTPUT);
   digitalWrite ( SENSOR_GND ,LOW);
@@ -98,13 +95,33 @@ void setup() {
   // マルチタスク
   // xTaskCreateUniversal(LoRaRecvTask, "LoRaRecvTask", 8192, NULL, 1, NULL,
   //                      1);
-  xTaskCreateUniversal(LoRaSendTask, "LoRaSendTask", 8192, NULL, 1, NULL,
-                       1);
+  // xTaskCreateUniversal(LoRaSendTask, "LoRaSendTask", 8192, NULL, 1, NULL,
+  //                      1);
+  timer = timerBegin(0, 80, true);                  //timer 0, div 80
+  timerAttachInterrupt(timer, &deep_sleep, true);  //attach callback
+  timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
+  timerAlarmEnable(timer);                          //enable interrupt
+
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  delay(10000);
+  timerWrite(timer, 0);
+  msg.bootcount = bootCount;
+  msg.myadress = config.own_address;
+  msg.temp = getTemp();
+  SerialLoRa.flush();
+  SerialMon.printf("I send data\n");
+  // digitalWrite(LED0 ,HIGH);
+  if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
+    delay(500);
+    SerialMon.printf("send succeeded.\n");
+    // digitalWrite(LED0 ,LOW);
+    SerialMon.printf("\n");
+  } else {
+    SerialMon.printf("send failed.\n");
+    SerialMon.printf("\n");
+  }
+
   deep_sleep();
 }
 

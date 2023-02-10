@@ -1,6 +1,6 @@
 #include "esp32_e220900t22s_jp_lib.h"
 #include <vector>
-
+#define OWN_ADDRESS 1
 SemaphoreHandle_t xMutex;
 
 template <typename T>
@@ -256,7 +256,7 @@ void CLoRa::SwitchToConfigurationMode(void) {
 
 void CLoRa::SetDefaultConfigValue(struct LoRaConfigItem_t &config) {
   const LoRaConfigItem_t default_config = {
-      0x0102, // own_address 0
+      OWN_ADDRESS, // own_address 0
       0b011, // baud_rate 9600 bps
       0b10000, // air_data_rate SF:9 BW:125
       0b11, // subpacket_size 200

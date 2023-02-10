@@ -2,15 +2,32 @@
 #include <Arduino.h>
 #include <FS.h>
 
+#define OWN_ADDRESS 378
 #define LED0 D0
 #define LED1 D1
 #define SENSOR_GND D5
 #define SENSOR_3V3 D6
 #define SENSOR_DQ D3
-const int sleepSec = 60 - 5;//実行時間5ｓ
+const int sleepSec = 60*1 - 5;//実行時間5ｓ
 RTC_DATA_ATTR uint16_t bootCount = 0;
 CLoRa lora;
-struct LoRaConfigItem_t config;
+struct LoRaConfigItem_t config = {
+      OWN_ADDRESS, // own_address 0
+      0b011, // baud_rate 9600 bps
+      0b10000, // air_data_rate SF:9 BW:125
+      0b11, // subpacket_size 200
+      0b1, // rssi_ambient_noise_flag 有効
+      0b0, // transmission_pause_flag 有効
+      0b01, // transmitting_power 13 dBm
+      0x00, // own_channel 0
+      0b1, // rssi_byte_flag 有効
+      0b0, // transmission_method_type トランスペアレント送信モード(default)
+      0b0, // lbt_flag 有効
+      0b011, // wor_cycle 2000 ms
+      0x0000, // encryption_key 0
+      0xFFFF, // target_address 0
+      0x00}; // target_channel 0
+
 struct RecvFrameE220900T22SJP_t data;
 
 /** prototype declaration **/
@@ -28,11 +45,11 @@ void ReadDataFromConsole(char *msg, int max_msg_len);
 OneWire oneWire(SENSOR_DQ);
 DallasTemperature sensors(&oneWire);
 
-struct msgStruct{ 
-  uint16_t bootcount;
+struct  __attribute__((packed, aligned(4))) msgStruct{ 
   uint16_t myadress ;
-  float temp  ; 
-  uint16_t end = 0x0a0d;
+  uint16_t water ;
+  uint16_t bootcount;
+  float temp  ;
 } msg;
 
 const int wdtTimeout = 30*1000;  //time in ms to trigger the watchdog
@@ -54,7 +71,7 @@ void IRAM_ATTR deep_sleep(){
           delay(10000);
         } 
         bootCount++;
-        // digitalWrite(LED0 ,LOW);
+        digitalWrite(SENSOR_3V3 ,LOW);
         // digitalWrite(LED1 ,LOW);
         esp_sleep_enable_timer_wakeup(sleepSec * 1000 * 1000);
       	esp_deep_sleep_start();
@@ -73,11 +90,11 @@ void setup() {
   sensors.begin();
   // LoRa設定値の読み込み
   
-  if (lora.LoadConfigSetting(CONFIG_FILENAME, config)) {
-    SerialMon.printf("Loading Configfile failed. The default value is set.\n");
-  } else {
-    SerialMon.printf("Loading Configfile succeeded.\n");
-  }
+  // if (lora.LoadConfigSetting(CONFIG_FILENAME, config)) {
+  //   SerialMon.printf("Loading Configfile failed. The default value is set.\n");
+  // } else {
+  //   SerialMon.printf("Loading Configfile succeeded.\n");
+  // }
 
   // E220-900T22S(JP)へのLoRa初期設定
   if (lora.InitLoRaModule(config)) {
@@ -106,9 +123,10 @@ void setup() {
 
 void loop() {
   timerWrite(timer, 0);
-  msg.bootcount = bootCount;
   msg.myadress = config.own_address;
   msg.temp = getTemp();
+  msg.water = bootCount ;//ここに水位
+  msg.bootcount = bootCount;
   SerialLoRa.flush();
   SerialMon.printf("I send data\n");
   // digitalWrite(LED0 ,HIGH);
@@ -125,84 +143,62 @@ void loop() {
   deep_sleep();
 }
 
-void LoRaRecvTask(void *pvParameters) {
-  while (1) {
-    if (lora.RecieveFrame(&data) == 0) {
-      digitalWrite(LED1 ,HIGH);
-      delay(500);
-      digitalWrite(LED1 ,LOW);
-      SerialMon.printf("from ATOM recv data:\n");
-      for (int i = 0; i < data.recv_data_len; i++) {
-        SerialMon.printf("%02x", data.recv_data[i]);
-      }
-      SerialMon.printf("\n");
-      SerialMon.printf("hex dump:\n");
-      for (int i = 0; i < data.recv_data_len; i++) {
-        SerialMon.printf("%02x ", data.recv_data[i]);
-      }
-      SerialMon.printf("\n");
-      SerialMon.printf("RSSI: %d dBm\n", data.rssi);
-      SerialMon.printf("\n");
+// void LoRaRecvTask(void *pvParameters) {
+//   while (1) {
+//     if (lora.RecieveFrame(&data) == 0) {
+//       digitalWrite(LED1 ,HIGH);
+//       delay(500);
+//       digitalWrite(LED1 ,LOW);
+//       SerialMon.printf("from ATOM recv data:\n");
+//       for (int i = 0; i < data.recv_data_len; i++) {
+//         SerialMon.printf("%02x", data.recv_data[i]);
+//       }
+//       SerialMon.printf("\n");
+//       SerialMon.printf("hex dump:\n");
+//       for (int i = 0; i < data.recv_data_len; i++) {
+//         SerialMon.printf("%02x ", data.recv_data[i]);
+//       }
+//       SerialMon.printf("\n");
+//       SerialMon.printf("RSSI: %d dBm\n", data.rssi);
+//       SerialMon.printf("\n");
 
-      SerialMon.flush();
+//       SerialMon.flush();
       
-      if ((data.recv_data[4]<<8 |data.recv_data[5]) == config.own_address){
-        SerialMon.printf("response ok \n");
-        delay(100);
-        deep_sleep();
-      }
-    }
+//       if ((data.recv_data[4]<<8 |data.recv_data[5]) == config.own_address){
+//         SerialMon.printf("response ok \n");
+//         delay(100);
+//         deep_sleep();
+//       }
+//     }
 
-    delay(1);
-  }
-}
+//     delay(1);
+//   }
+// }
 
-void LoRaSendTask(void *pvParameters) {
-  while (1) {
-    // lora.SwitchToNormalMode();
-    msg.bootcount = bootCount;
-    msg.myadress = config.own_address;
-    msg.temp = getTemp();
+// void LoRaSendTask(void *pvParameters) {
+//   while (1) {
+//     // lora.SwitchToNormalMode();
+//     msg.bootcount = bootCount;
+//     msg.myadress = config.own_address;
+//     msg.temp = getTemp();
+//     msg.water = bootCount % 100;//ここに水位
+//     SerialLoRa.flush();
+//     SerialMon.printf("I send data\n");
+//     digitalWrite(LED0 ,HIGH);
+//     if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
+//       delay(500);
+//       SerialMon.printf("send succeeded.\n");
+//       digitalWrite(LED0 ,LOW);
+//       SerialMon.printf("\n");
+//     } else {
+//       SerialMon.printf("send failed.\n");
+//       SerialMon.printf("\n");
+//     }
 
-
-    // union ByteFloatUnion{
-    //   uint8_t byteformat[4];
-    //   float floatformat;
-    // } temp;
-  
-    // temp.floatformat = getTemp();
-    // delay(200);
-    // char  msg[32] = {0};
-    // // msg[0] = 0x00;
-    // msg[0] = bootCount;
-    // msg[1] = config.own_address>>8;
-    // msg[2] = config.own_address&0xff;
-    // msg[3] = 0x0A;
-    // msg[4] = 0x0d;
-    // msg[5] = temp.byteformat[0];
-    // msg[6] = temp.byteformat[1];
-    // msg[7] = temp.byteformat[2];
-    // msg[8] = temp.byteformat[3];
-    // msg[9] = 0x0A;
-    // msg[10] = 0x0d;
-// SerialMon.printf("%04x",config.own_address);
-    SerialLoRa.flush();
-    SerialMon.printf("I send data\n");
-    digitalWrite(LED0 ,HIGH);
-    if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
-      delay(500);
-      SerialMon.printf("send succeeded.\n");
-      digitalWrite(LED0 ,LOW);
-      SerialMon.printf("\n");
-    } else {
-      SerialMon.printf("send failed.\n");
-      SerialMon.printf("\n");
-    }
-
-    // SerialMon.flush();
-    // lora.SwitchToConfigurationMode();
+//     // SerialMon.flush();
+//     // lora.SwitchToConfigurationMode();
     
-    delay(30000);
-    deep_sleep();
-  }
-}
+//     delay(30000);
+//     deep_sleep();
+//   }
+// }

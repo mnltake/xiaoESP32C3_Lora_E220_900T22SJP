@@ -99,7 +99,7 @@ public:
    * @brief コンフィグモード(M0=1,M1=1)へ移行する
    */
   void SwitchToConfigurationMode(void);
-
+  
 private:
   uint16_t own_address_val;
   uint32_t baud_rate_val;

@@ -2,13 +2,13 @@
 #include <Arduino.h>
 #include <FS.h>
 
-#define OWN_ADDRESS 378
+#define OWN_ADDRESS 117
 #define LED0 D0
 #define LED1 D1
 #define SENSOR_GND D5
 #define SENSOR_3V3 D6
 #define SENSOR_DQ D3
-const int sleepSec = 60*1 - 5;//実行時間5ｓ
+uint64_t sleepSec = 60*60 - 5;//実行時間5ｓ
 RTC_DATA_ATTR uint16_t bootCount = 0;
 CLoRa lora;
 struct LoRaConfigItem_t config = {
@@ -67,9 +67,14 @@ float getTemp(){
 void IRAM_ATTR deep_sleep(){
         SerialMon.printf("sleep \n");
         lora.SwitchToConfigurationMode();
-        if (!bootCount){
+        if (bootCount == 0){
           delay(10000);
         } 
+        if (bootCount < 10)
+        {
+          sleepSec = 25;
+        }
+        
         bootCount++;
         digitalWrite(SENSOR_3V3 ,LOW);
         // digitalWrite(LED1 ,LOW);

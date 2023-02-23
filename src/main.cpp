@@ -2,9 +2,10 @@
 #include <Arduino.h>
 #include <FS.h>
 
-#define OWN_ADDRESS 117
-#define LED0 D0
-#define LED1 D1
+#define OWN_ADDRESS 1
+#define SW_LOW D0
+#define SW_HIGH D1
+#define SW_COM D2
 #define SENSOR_GND D5
 #define SENSOR_3V3 D6
 #define SENSOR_DQ D3
@@ -85,14 +86,16 @@ void IRAM_ATTR deep_sleep(){
 void setup() {
   // put your setup code here, to run once:
   SerialMon.begin(9600);
-  delay(2000); // SerialMon init wait
+  while(!SerialMon){}; // SerialMon init wait
   SerialMon.println("start");
-  // pinMode( LED0 ,OUTPUT);
-  // pinMode( LED1 ,OUTPUT);
+  pinMode( SW_LOW ,INPUT_PULLUP);
+  pinMode( SW_HIGH ,INPUT_PULLUP);
+  pinMode( SW_COM ,OUTPUT);
   pinMode( SENSOR_3V3 ,OUTPUT);
   pinMode( SENSOR_GND ,OUTPUT);
   digitalWrite ( SENSOR_GND ,LOW);
-  sensors.begin();
+  digitalWrite ( SW_COM ,LOW);
+  // sensors.begin();
   // LoRa設定値の読み込み
   
   // if (lora.LoadConfigSetting(CONFIG_FILENAME, config)) {
@@ -109,7 +112,7 @@ void setup() {
 
   // ノーマルモード(M0=0,M1=0)へ移行する
   lora.SwitchToNormalMode();
-
+  while(!digitalRead(LoRa_AUXPin)){}
   // timer = timerBegin(0, 80, true);                  //timer 0, div 80
   // timerAttachInterrupt(timer, &resetModule, true);  //attach callback
   // timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
@@ -123,29 +126,28 @@ void setup() {
   timerAttachInterrupt(timer, &deep_sleep, true);  //attach callback
   timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
   timerAlarmEnable(timer);                          //enable interrupt
-
-}
-
-void loop() {
   timerWrite(timer, 0);
   msg.myadress = config.own_address;
   msg.temp = getTemp();
-  msg.water = bootCount ;//ここに水位
+  msg.temp = -127;
+  msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
   msg.bootcount = bootCount;
+  SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
   SerialLoRa.flush();
   SerialMon.printf("I send data\n");
-  // digitalWrite(LED0 ,HIGH);
   if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
     delay(500);
     SerialMon.printf("send succeeded.\n");
-    // digitalWrite(LED0 ,LOW);
     SerialMon.printf("\n");
   } else {
     SerialMon.printf("send failed.\n");
     SerialMon.printf("\n");
   }
-
   deep_sleep();
+}
+
+void loop() {
+
 }
 
 // void LoRaRecvTask(void *pvParameters) {

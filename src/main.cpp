@@ -86,7 +86,8 @@ void IRAM_ATTR deep_sleep(){
 void setup() {
   // put your setup code here, to run once:
   SerialMon.begin(9600);
-  while(!SerialMon){}; // SerialMon init wait
+  delay(500);
+  // while(!SerialMon){}; // SerialMon init wait
   SerialMon.println("start");
   pinMode( SW_LOW ,INPUT_PULLUP);
   pinMode( SW_HIGH ,INPUT_PULLUP);
@@ -128,7 +129,7 @@ void setup() {
   timerAlarmEnable(timer);                          //enable interrupt
   timerWrite(timer, 0);
   msg.myadress = config.own_address;
-  msg.temp = getTemp();
+  // msg.temp = getTemp();
   msg.temp = -127;
   msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
   msg.bootcount = bootCount;

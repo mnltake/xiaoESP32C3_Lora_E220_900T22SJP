@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <FS.h>
 
-#define OWN_ADDRESS 1
+#define OWN_ADDRESS 44
 #define SW_LOW D0
 #define SW_HIGH D1
 #define SW_COM D2
@@ -41,10 +41,10 @@ void ReadDataFromConsole(char *msg, int max_msg_len);
 
 
 //DS18B20
-#include <OneWire.h>
-#include <DallasTemperature.h>
-OneWire oneWire(SENSOR_DQ);
-DallasTemperature sensors(&oneWire);
+// #include <OneWire.h>
+// #include <DallasTemperature.h>
+// OneWire oneWire(SENSOR_DQ);
+// DallasTemperature sensors(&oneWire);
 
 struct  __attribute__((packed, aligned(4))) msgStruct{ 
   uint16_t myadress ;
@@ -57,12 +57,13 @@ const int wdtTimeout = 30*1000;  //time in ms to trigger the watchdog
 hw_timer_t *timer = NULL;
 
 float getTemp(){
-  digitalWrite (SENSOR_3V3 ,HIGH);
-  delay(10);
-  sensors.requestTemperatures(); 
-  Serial.print("Temperature:");
-  Serial.println(sensors.getTempCByIndex(0));
-  return sensors.getTempCByIndex(0);
+  // digitalWrite (SENSOR_3V3 ,HIGH);
+  // delay(10);
+  // sensors.requestTemperatures(); 
+  // Serial.print("Temperature:");
+  // Serial.println(sensors.getTempCByIndex(0));
+  // return sensors.getTempCByIndex(0);
+  return -127;
 }
 
 void IRAM_ATTR deep_sleep(){
@@ -129,8 +130,8 @@ void setup() {
   timerAlarmEnable(timer);                          //enable interrupt
   timerWrite(timer, 0);
   msg.myadress = config.own_address;
-  // msg.temp = getTemp();
-  msg.temp = -127;
+  msg.temp = getTemp();
+  // msg.temp = -127;
   msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
   msg.bootcount = bootCount;
   SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);

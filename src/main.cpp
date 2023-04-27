@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <FS.h>
 
-#define OWN_ADDRESS 142
+#define OWN_ADDRESS 184
 #define SW_LOW D0
 #define SW_HIGH D1
 #define SW_COM D2
@@ -90,6 +90,7 @@ void setup() {
   delay(500);
   // while(!SerialMon){}; // SerialMon init wait
   SerialMon.println("start");
+  SerialMon.println(OWN_ADDRESS);
   pinMode( SW_LOW ,INPUT_PULLUP);
   pinMode( SW_HIGH ,INPUT_PULLUP);
   pinMode( SW_COM ,OUTPUT);

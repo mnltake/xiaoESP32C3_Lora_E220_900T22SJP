@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <FS.h>
 
-#define OWN_ADDRESS 44
+#define OWN_ADDRESS 142
 #define SW_LOW D0
 #define SW_HIGH D1
 #define SW_COM D2

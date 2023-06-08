@@ -96,11 +96,12 @@ void setup() {
   pinMode( SW_HIGH ,INPUT_PULLUP);
   pinMode( SW_COM ,OUTPUT);
   digitalWrite ( SW_COM ,LOW);
-  pinMode( SECOND_SW_LOW ,INPUT_PULLUP);
-  pinMode( SECOND_SW_HIGH ,INPUT_PULLUP);
-  pinMode( SECOND_SW_COM ,OUTPUT);
-  digitalWrite ( SECOND_SW_COM ,LOW);
-  
+  #ifdef SECOND_ADDRESS
+    pinMode( SECOND_SW_LOW ,INPUT_PULLUP);
+    pinMode( SECOND_SW_HIGH ,INPUT_PULLUP);
+    pinMode( SECOND_SW_COM ,OUTPUT);
+    digitalWrite ( SECOND_SW_COM ,LOW);
+  #endif
   
 
   // sensors.begin();
@@ -151,26 +152,28 @@ void setup() {
     SerialMon.printf("send failed.\n");
     SerialMon.printf("\n");
   }
-  timerWrite(timer, 0);
-  delay(5000);
-  SerialMon.println(SECOND_ADDRESS);
-  msg.myadress = SECOND_ADDRESS;
-  msg.temp = getTemp();
-  // msg.temp = -127;
-  msg.water = digitalRead( SECOND_SW_LOW) * 49 + digitalRead( SECOND_SW_HIGH) * 51; //ここに水位
-  msg.bootcount = bootCount;
-  SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
-  SerialLoRa.flush();
-  SerialMon.printf("I send data\n");
-  if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
-    delay(500);
-    SerialMon.printf("send succeeded.\n");
-    SerialMon.printf("\n");
-  } else {
-    SerialMon.printf("send failed.\n");
-    SerialMon.printf("\n");
-  }
-
+  
+  #ifdef SECOND_ADDRESS
+    timerWrite(timer, 0);
+    delay(5000);
+    SerialMon.println(SECOND_ADDRESS);
+    msg.myadress = SECOND_ADDRESS;
+    msg.temp = getTemp();
+    // msg.temp = -127;
+    msg.water = digitalRead( SECOND_SW_LOW) * 49 + digitalRead( SECOND_SW_HIGH) * 51; //ここに水位
+    msg.bootcount = bootCount;
+    SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
+    SerialLoRa.flush();
+    SerialMon.printf("I send data\n");
+    if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
+      delay(500);
+      SerialMon.printf("send succeeded.\n");
+      SerialMon.printf("\n");
+    } else {
+      SerialMon.printf("send failed.\n");
+      SerialMon.printf("\n");
+    }
+  #endif
 
   deep_sleep();
 }

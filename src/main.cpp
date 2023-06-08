@@ -2,13 +2,14 @@
 #include <Arduino.h>
 #include <FS.h>
 
-#define OWN_ADDRESS 117
+#define OWN_ADDRESS 197
+#define SECOND_ADDRESS 198
 #define SW_LOW D0
 #define SW_HIGH D1
 #define SW_COM D2
-#define SENSOR_GND D5
-#define SENSOR_3V3 D6
-#define SENSOR_DQ D3
+#define SECOND_SW_LOW D3
+#define SECOND_SW_HIGH D4
+#define SECOND_SW_COM D5
 uint64_t sleepSec = 60*60 - 5;//実行時間5ｓ
 RTC_DATA_ATTR uint16_t bootCount = 0;
 CLoRa lora;
@@ -78,7 +79,7 @@ void IRAM_ATTR deep_sleep(){
         }
         
         bootCount++;
-        digitalWrite(SENSOR_3V3 ,LOW);
+
         // digitalWrite(LED1 ,LOW);
         esp_sleep_enable_timer_wakeup(sleepSec * 1000 * 1000);
       	esp_deep_sleep_start();
@@ -94,10 +95,14 @@ void setup() {
   pinMode( SW_LOW ,INPUT_PULLUP);
   pinMode( SW_HIGH ,INPUT_PULLUP);
   pinMode( SW_COM ,OUTPUT);
-  pinMode( SENSOR_3V3 ,OUTPUT);
-  pinMode( SENSOR_GND ,OUTPUT);
-  digitalWrite ( SENSOR_GND ,LOW);
   digitalWrite ( SW_COM ,LOW);
+  pinMode( SECOND_SW_LOW ,INPUT_PULLUP);
+  pinMode( SECOND_SW_HIGH ,INPUT_PULLUP);
+  pinMode( SECOND_SW_COM ,OUTPUT);
+  digitalWrite ( SECOND_SW_COM ,LOW);
+  
+  
+
   // sensors.begin();
   // LoRa設定値の読み込み
   
@@ -146,6 +151,27 @@ void setup() {
     SerialMon.printf("send failed.\n");
     SerialMon.printf("\n");
   }
+  timerWrite(timer, 0);
+  delay(5000);
+  SerialMon.println(SECOND_ADDRESS);
+  msg.myadress = SECOND_ADDRESS;
+  msg.temp = getTemp();
+  // msg.temp = -127;
+  msg.water = digitalRead( SECOND_SW_LOW) * 49 + digitalRead( SECOND_SW_HIGH) * 51; //ここに水位
+  msg.bootcount = bootCount;
+  SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
+  SerialLoRa.flush();
+  SerialMon.printf("I send data\n");
+  if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
+    delay(500);
+    SerialMon.printf("send succeeded.\n");
+    SerialMon.printf("\n");
+  } else {
+    SerialMon.printf("send failed.\n");
+    SerialMon.printf("\n");
+  }
+
+
   deep_sleep();
 }
 

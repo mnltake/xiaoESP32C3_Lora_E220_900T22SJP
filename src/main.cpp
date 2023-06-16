@@ -2,8 +2,8 @@
 #include <Arduino.h>
 #include <FS.h>
 
-#define OWN_ADDRESS 197
-#define SECOND_ADDRESS 198
+#define OWN_ADDRESS 219
+// #define SECOND_ADDRESS 
 #define SW_LOW D0
 #define SW_HIGH D1
 #define SW_COM D2
@@ -21,14 +21,14 @@ struct LoRaConfigItem_t config = {
       0b1, // rssi_ambient_noise_flag 有効
       0b0, // transmission_pause_flag 有効
       0b01, // transmitting_power 13 dBm
-      0x00, // own_channel 0
+      0x09, // own_channel 0
       0b1, // rssi_byte_flag 有効
       0b0, // transmission_method_type トランスペアレント送信モード(default)
       0b0, // lbt_flag 有効
       0b011, // wor_cycle 2000 ms
       0x0000, // encryption_key 0
       0xFFFF, // target_address 0
-      0x00}; // target_channel 0
+      0x09}; // target_channel 0
 
 struct RecvFrameE220900T22SJP_t data;
 

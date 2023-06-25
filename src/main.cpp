@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <FS.h>
 
-#define OWN_ADDRESS 158
+#define OWN_ADDRESS 161
 // #define SECOND_ADDRESS 
 #define SW_LOW D0
 #define SW_HIGH D1
@@ -48,6 +48,7 @@ void ReadDataFromConsole(char *msg, int max_msg_len);
 // DallasTemperature sensors(&oneWire);
 
 struct  __attribute__((packed, aligned(4))) msgStruct{ 
+  uint32_t config = 0xffff00;
   uint16_t myadress ;
   uint16_t water ;
   uint16_t bootcount;
@@ -114,11 +115,29 @@ void setup() {
   // }
 
   // E220-900T22S(JP)へのLoRa初期設定
-  if (lora.InitLoRaModule(config)) {
-    SerialMon.printf("init error\n");
-    return;
-  }
+  // if (lora.InitLoRaModule(config)) {
+  //   SerialMon.printf("init error\n");
+  //   return;
+  // }
+  uint8_t conf[] ={0xc0, 0x00, 0x08, 0x00, 0x9e, 0x70, 0xe0, 0x00, 0x83, 0x00, 0x00};
+  SerialLoRa.end(); // end()を実行　←←追加
+  delay(1000); // 1秒待つ　 ←←追加
+  SerialLoRa.begin(LoRa_BaudRate, SERIAL_8N1, LoRa_Tx_ESP_RxPin,LoRa_Rx_ESP_TxPin);
+//   lora.SwitchToConfigurationMode();
+//   while(!digitalRead(LoRa_AUXPin)){}
+//   SerialMon.printf("I send conf\n\n");
+// for (size_t i = 0; i < sizeof(conf); i++)
+// {
+  
+//   SerialMon.printf("%x",conf[i]);
+// }
+// for (size_t i = 0; i < sizeof(conf); i++)
+// {
 
+//   SerialLoRa.write(conf[i]);
+// }
+//     // SerialLoRa.write((uint8_t *)&msg, sizeof(msg));
+//     SerialLoRa.flush();
   // ノーマルモード(M0=0,M1=0)へ移行する
   lora.SwitchToNormalMode();
   while(!digitalRead(LoRa_AUXPin)){}
@@ -143,15 +162,38 @@ void setup() {
   msg.bootcount = bootCount;
   SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
   SerialLoRa.flush();
-  SerialMon.printf("I send data\n");
-  if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
-    delay(500);
-    SerialMon.printf("send succeeded.\n");
-    SerialMon.printf("\n");
-  } else {
-    SerialMon.printf("send failed.\n");
-    SerialMon.printf("\n");
-  }
+
+ 
+  uint8_t payload[]={0xff, 0xff, 0x00 ,msg.myadress & 0xff ,msg.myadress >> 8 ,msg.water &0xff, 0x00, msg.bootcount & 0xff, msg.bootcount >> 8, 0x00, 0x00 ,0xfe, 0xc2, 0x00, 0x00};
+   SerialMon.printf("I send data\n\n");
+   for (size_t i = 0; i < sizeof(payload); i++)
+{
+  
+  SerialMon.printf("%x",payload[i]);
+}
+for (size_t i = 0; i < sizeof(payload); i++)
+{
+
+  SerialLoRa.write(payload[i]);
+}
+    // SerialLoRa.write((uint8_t *)&msg, sizeof(msg));
+    SerialLoRa.flush();
+    delay(100);
+    while (SerialLoRa.available()) {
+      while (SerialLoRa.available()) {
+        SerialLoRa.read();
+      }
+      delay(100);
+    }
+  // SerialLoRa.write((uint8_t *)payload, sizeof(payload));
+  // if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
+  //   delay(500);
+  //   SerialMon.printf("send succeeded.\n");
+  //   SerialMon.printf("\n");
+  // } else {
+  //   SerialMon.printf("send failed.\n");
+  //   SerialMon.printf("\n");
+  // }
   
   #ifdef SECOND_ADDRESS
     timerWrite(timer, 0);

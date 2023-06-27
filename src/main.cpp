@@ -195,6 +195,7 @@ void setup() {
     // msg.temp = -127;
     msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
     msg.bootcount = bootCount;
+    SerialMon.println(SECOND_ADDRESS);
     SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
     SerialLoRa.flush();
 

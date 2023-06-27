@@ -2,8 +2,8 @@
 #include <Arduino.h>
 #include <FS.h>
 
-#define OWN_ADDRESS 161
-// #define SECOND_ADDRESS 
+#define OWN_ADDRESS 369
+#define SECOND_ADDRESS 251
 #define SW_LOW D0
 #define SW_HIGH D1
 #define SW_COM D2
@@ -41,11 +41,6 @@ void ReadDataFromConsole(char *msg, int max_msg_len);
 #include "esp_system.h"
 
 
-//DS18B20
-// #include <OneWire.h>
-// #include <DallasTemperature.h>
-// OneWire oneWire(SENSOR_DQ);
-// DallasTemperature sensors(&oneWire);
 
 struct  __attribute__((packed, aligned(4))) msgStruct{ 
   uint32_t config = 0xffff00;
@@ -83,6 +78,8 @@ void IRAM_ATTR deep_sleep(){
 
         // digitalWrite(LED1 ,LOW);
         esp_sleep_enable_timer_wakeup(sleepSec * 1000 * 1000);
+        // gpio_hold_en(GPIO_NUM_20);
+        // gpio_deep_sleep_hold_en();
       	esp_deep_sleep_start();
 }
 
@@ -90,6 +87,8 @@ void setup() {
   // put your setup code here, to run once:
   SerialMon.begin(9600);
   delay(500);
+  // gpio_hold_dis(GPIO_NUM_20);
+  // gpio_deep_sleep_hold_dis();
   // while(!SerialMon){}; // SerialMon init wait
   SerialMon.println("start");
   SerialMon.println(OWN_ADDRESS);
@@ -123,21 +122,22 @@ void setup() {
   SerialLoRa.end(); // end()を実行　←←追加
   delay(1000); // 1秒待つ　 ←←追加
   SerialLoRa.begin(LoRa_BaudRate, SERIAL_8N1, LoRa_Tx_ESP_RxPin,LoRa_Rx_ESP_TxPin);
-//   lora.SwitchToConfigurationMode();
-//   while(!digitalRead(LoRa_AUXPin)){}
-//   SerialMon.printf("I send conf\n\n");
-// for (size_t i = 0; i < sizeof(conf); i++)
-// {
-  
-//   SerialMon.printf("%x",conf[i]);
-// }
-// for (size_t i = 0; i < sizeof(conf); i++)
-// {
-
-//   SerialLoRa.write(conf[i]);
-// }
-//     // SerialLoRa.write((uint8_t *)&msg, sizeof(msg));
-//     SerialLoRa.flush();
+  if(!bootCount){
+    lora.SwitchToConfigurationMode();
+    while(!digitalRead(LoRa_AUXPin)){}
+    SerialMon.printf("I send conf\n\n");
+    for (size_t i = 0; i < sizeof(conf); i++)
+    {
+      
+      SerialMon.printf("%x",conf[i]);
+    }
+    for (size_t i = 0; i < sizeof(conf); i++)
+    {
+    SerialLoRa.write(conf[i]);
+    }
+  }
+    // SerialLoRa.write((uint8_t *)&msg, sizeof(msg));
+  SerialLoRa.flush();
   // ノーマルモード(M0=0,M1=0)へ移行する
   lora.SwitchToNormalMode();
   while(!digitalRead(LoRa_AUXPin)){}
@@ -158,33 +158,24 @@ void setup() {
   msg.myadress = config.own_address;
   msg.temp = getTemp();
   // msg.temp = -127;
-  msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
+  msg.water = digitalRead( SECOND_SW_LOW) * 49 + digitalRead( SECOND_SW_HIGH) * 51; //ここに水位
   msg.bootcount = bootCount;
   SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
   SerialLoRa.flush();
-
- 
   uint8_t payload[]={0xff, 0xff, 0x00 ,msg.myadress & 0xff ,msg.myadress >> 8 ,msg.water &0xff, 0x00, msg.bootcount & 0xff, msg.bootcount >> 8, 0x00, 0x00 ,0xfe, 0xc2, 0x00, 0x00};
-   SerialMon.printf("I send data\n\n");
-   for (size_t i = 0; i < sizeof(payload); i++)
-{
-  
-  SerialMon.printf("%x",payload[i]);
-}
-for (size_t i = 0; i < sizeof(payload); i++)
-{
+  SerialMon.printf("I send data\n\n");
+  for (size_t i = 0; i < sizeof(payload); i++)
+  {
+    SerialMon.printf("%x",payload[i]);
+  }
+  for (size_t i = 0; i < sizeof(payload); i++)
+  {
+    SerialLoRa.write(payload[i]);
+  }
+  // SerialLoRa.write((uint8_t *)&msg, sizeof(msg));
+  SerialLoRa.flush();
+  delay(100);
 
-  SerialLoRa.write(payload[i]);
-}
-    // SerialLoRa.write((uint8_t *)&msg, sizeof(msg));
-    SerialLoRa.flush();
-    delay(100);
-    while (SerialLoRa.available()) {
-      while (SerialLoRa.available()) {
-        SerialLoRa.read();
-      }
-      delay(100);
-    }
   // SerialLoRa.write((uint8_t *)payload, sizeof(payload));
   // if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
   //   delay(500);
@@ -198,23 +189,32 @@ for (size_t i = 0; i < sizeof(payload); i++)
   #ifdef SECOND_ADDRESS
     timerWrite(timer, 0);
     delay(5000);
-    SerialMon.println(SECOND_ADDRESS);
+    timerWrite(timer, 0);
     msg.myadress = SECOND_ADDRESS;
     msg.temp = getTemp();
     // msg.temp = -127;
-    msg.water = digitalRead( SECOND_SW_LOW) * 49 + digitalRead( SECOND_SW_HIGH) * 51; //ここに水位
+    msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
     msg.bootcount = bootCount;
     SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
     SerialLoRa.flush();
-    SerialMon.printf("I send data\n");
-    if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
-      delay(500);
-      SerialMon.printf("send succeeded.\n");
-      SerialMon.printf("\n");
-    } else {
-      SerialMon.printf("send failed.\n");
-      SerialMon.printf("\n");
+
+
+    uint8_t payload2[]={0xff, 0xff, 0x00 ,msg.myadress & 0xff ,msg.myadress >> 8 ,msg.water &0xff, 0x00, msg.bootcount & 0xff, msg.bootcount >> 8, 0x00, 0x00 ,0xfe, 0xc2, 0x00, 0x00};
+      SerialMon.printf("I send data\n\n");
+      for (size_t i = 0; i < sizeof(payload2); i++)
+    {
+
+    SerialMon.printf("%x",payload2[i]);
     }
+    for (size_t i = 0; i < sizeof(payload2); i++)
+    {
+
+    SerialLoRa.write(payload2[i]);
+    }
+      // SerialLoRa.write((uint8_t *)&msg, sizeof(msg));
+      SerialLoRa.flush();
+      delay(100);
+
   #endif
 
   deep_sleep();

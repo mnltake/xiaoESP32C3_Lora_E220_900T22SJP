@@ -2,8 +2,7 @@
 #include <Arduino.h>
 #include <FS.h>
 
-#define OWN_ADDRESS 369
-#define SECOND_ADDRESS 251
+#define OWN_ADDRESS 135
 #define SW_LOW D0
 #define SW_HIGH D1
 #define SW_COM D2
@@ -114,10 +113,10 @@ void setup() {
   // }
 
   // E220-900T22S(JP)へのLoRa初期設定
-  // if (lora.InitLoRaModule(config)) {
-  //   SerialMon.printf("init error\n");
-  //   return;
-  // }
+  if (lora.InitLoRaModule(config)) {
+    SerialMon.printf("init error\n");
+    return;
+  }
   uint8_t conf[] ={0xc0, 0x00, 0x08, 0x00, 0x9e, 0x70, 0xe0, 0x00, 0x83, 0x00, 0x00};
   SerialLoRa.end(); // end()を実行　←←追加
   delay(1000); // 1秒待つ　 ←←追加
@@ -129,7 +128,7 @@ void setup() {
     for (size_t i = 0; i < sizeof(conf); i++)
     {
       
-      SerialMon.printf("%x",conf[i]);
+      SerialMon.printf(" %02x",conf[i]);
     }
     for (size_t i = 0; i < sizeof(conf); i++)
     {
@@ -155,10 +154,11 @@ void setup() {
   timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
   timerAlarmEnable(timer);                          //enable interrupt
   timerWrite(timer, 0);
-  msg.myadress = config.own_address;
+  msg.myadress = OWN_ADDRESS;
   msg.temp = getTemp();
   // msg.temp = -127;
-  msg.water = digitalRead( SECOND_SW_LOW) * 49 + digitalRead( SECOND_SW_HIGH) * 51; //ここに水位
+  msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
+ 
   msg.bootcount = bootCount;
   SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
   SerialLoRa.flush();
@@ -166,7 +166,7 @@ void setup() {
   SerialMon.printf("I send data\n\n");
   for (size_t i = 0; i < sizeof(payload); i++)
   {
-    SerialMon.printf("%x",payload[i]);
+    SerialMon.printf(" %02x",payload[i]);
   }
   for (size_t i = 0; i < sizeof(payload); i++)
   {
@@ -193,7 +193,7 @@ void setup() {
     msg.myadress = SECOND_ADDRESS;
     msg.temp = getTemp();
     // msg.temp = -127;
-    msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
+    msg.water = digitalRead( SECOND_SW_LOW) * 49 + digitalRead( SECOND_SW_HIGH) * 51; //ここに水位
     msg.bootcount = bootCount;
     SerialMon.println(SECOND_ADDRESS);
     SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);

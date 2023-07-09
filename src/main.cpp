@@ -1,8 +1,21 @@
-#include "esp32_e220900t22s_jp_lib.h"
 #include <Arduino.h>
-#include <FS.h>
+// Set serial for debug console (to the Serial Monitor)
+#define SerialMon Serial
+// Set serial for LoRa (to the module)
+#define SerialLoRa Serial1
 
-#define OWN_ADDRESS 135
+// E220-900T22S(JP)へのピンアサイン
+#define LoRa_ModeSettingPin_M0 D7
+#define LoRa_ModeSettingPin_M1 D7
+#define LoRa_Rx_ESP_TxPin D8
+#define LoRa_Tx_ESP_RxPin D9
+#define LoRa_AUXPin D10
+
+// E220-900T22S(JP)のbaud rate
+#define LoRa_BaudRate 9600
+
+#define OWN_ADDRESS 108
+#define SECOND_ADDRESS 109
 #define SW_LOW D0
 #define SW_HIGH D1
 #define SW_COM D2
@@ -11,46 +24,48 @@
 #define SECOND_SW_COM D5
 uint64_t sleepSec = 60*60 - 5;//実行時間5ｓ
 RTC_DATA_ATTR uint16_t bootCount = 0;
-CLoRa lora;
-struct LoRaConfigItem_t config = {
-      OWN_ADDRESS, // own_address 0
-      0b011, // baud_rate 9600 bps
-      0b10000, // air_data_rate SF:9 BW:125
-      0b11, // subpacket_size 200
-      0b1, // rssi_ambient_noise_flag 有効
-      0b0, // transmission_pause_flag 有効
-      0b00, // transmitting_power 13 dBm
-      0x00, // own_channel 0
-      0b1, // rssi_byte_flag 有効
-      0b0, // transmission_method_type トランスペアレント送信モード(default)
-      0b0, // lbt_flag 有効
-      0b011, // wor_cycle 2000 ms
-      0x0000, // encryption_key 0
-      0xFFFF, // target_address 0
-      0x00}; // target_channel 0
-
-struct RecvFrameE220900T22SJP_t data;
-
-/** prototype declaration **/
-void LoRaRecvTask(void *pvParameters);
-void LoRaSendTask(void *pvParameters);
-void ReadDataFromConsole(char *msg, int max_msg_len);
 
 //WDT
 #include "esp_system.h"
+const int wdtTimeout = 30*1000;  //time in ms to trigger the watchdog
+hw_timer_t *timer = NULL;
 
-
-
+uint8_t conf[] ={0xc0, 0x00, 0x08, 
+                OWN_ADDRESS >> 8, //ADDH
+                OWN_ADDRESS & 0xff, //ADDL
+                0b01110000, // baud_rate 9600 bps  SF:9 BW:125
+                0b11100000, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 13 dBm
+                0x00, //own_channel
+                0b10000011, //RSSI on ,fix mode,wor_cycle 2000 ms
+                0x00, //CRYPT
+                0x00};
 struct  __attribute__((packed, aligned(4))) msgStruct{ 
-  uint32_t config = 0xffff00;
-  uint16_t myadress ;
+  uint32_t config = 0xffff00;//ch0
+  uint16_t myadress = OWN_ADDRESS;
   uint16_t water ;
   uint16_t bootcount;
   float temp  ;
 } msg;
 
-const int wdtTimeout = 30*1000;  //time in ms to trigger the watchdog
-hw_timer_t *timer = NULL;
+
+  /**
+   * @brief ノーマルモード(M0=0,M1=0)へ移行する
+   */
+void SwitchToNormalMode(void){
+  digitalWrite(LoRa_ModeSettingPin_M0, 0);
+  digitalWrite(LoRa_ModeSettingPin_M1, 0);
+  delay(100);
+}
+
+
+  /**
+   * @brief コンフィグ/sleepモード(M0=1,M1=1)へ移行する
+   */
+void SwitchToConfigurationMode(void){
+  digitalWrite(LoRa_ModeSettingPin_M0, 1);
+  digitalWrite(LoRa_ModeSettingPin_M1, 1);
+  delay(100);
+}
 
 float getTemp(){
   // digitalWrite (SENSOR_3V3 ,HIGH);
@@ -64,7 +79,7 @@ float getTemp(){
 
 void IRAM_ATTR deep_sleep(){
         SerialMon.printf("sleep \n");
-        lora.SwitchToConfigurationMode();
+        SwitchToConfigurationMode();
         if (bootCount == 0){
           delay(10000);
         } 
@@ -72,10 +87,7 @@ void IRAM_ATTR deep_sleep(){
         {
           sleepSec = 25;
         }
-        
         bootCount++;
-
-        // digitalWrite(LED1 ,LOW);
         esp_sleep_enable_timer_wakeup(sleepSec * 1000 * 1000);
         // gpio_hold_en(GPIO_NUM_20);
         // gpio_deep_sleep_hold_en();
@@ -84,6 +96,11 @@ void IRAM_ATTR deep_sleep(){
 
 void setup() {
   // put your setup code here, to run once:
+  timer = timerBegin(0, 80, true);                  //timer 0, div 80
+  timerAttachInterrupt(timer, &deep_sleep, true);  //attach callback
+  timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
+  timerAlarmEnable(timer);                          //enable interrupt
+  timerWrite(timer, 0);
   SerialMon.begin(9600);
   delay(500);
   // gpio_hold_dis(GPIO_NUM_20);
@@ -95,6 +112,8 @@ void setup() {
   pinMode( SW_HIGH ,INPUT_PULLUP);
   pinMode( SW_COM ,OUTPUT);
   digitalWrite ( SW_COM ,LOW);
+  pinMode(LoRa_ModeSettingPin_M0, OUTPUT);
+  pinMode(LoRa_ModeSettingPin_M1, OUTPUT);
   #ifdef SECOND_ADDRESS
     pinMode( SECOND_SW_LOW ,INPUT_PULLUP);
     pinMode( SECOND_SW_HIGH ,INPUT_PULLUP);
@@ -102,90 +121,50 @@ void setup() {
     digitalWrite ( SECOND_SW_COM ,LOW);
   #endif
   
-
-  // sensors.begin();
-  // LoRa設定値の読み込み
-  
-  // if (lora.LoadConfigSetting(CONFIG_FILENAME, config)) {
-  //   SerialMon.printf("Loading Configfile failed. The default value is set.\n");
-  // } else {
-  //   SerialMon.printf("Loading Configfile succeeded.\n");
-  // }
-
   // E220-900T22S(JP)へのLoRa初期設定
-  if (lora.InitLoRaModule(config)) {
-    SerialMon.printf("init error\n");
-    return;
-  }
-  uint8_t conf[] ={0xc0, 0x00, 0x08, 0x00, 0x9e, 0x70, 0xe0, 0x00, 0x83, 0x00, 0x00};
+  SerialLoRa.end(); // end()を実行　←←追加
+  delay(1000); // 1秒待つ　 ←←追加
+  SerialLoRa.begin(LoRa_BaudRate, SERIAL_8N1, LoRa_Tx_ESP_RxPin,LoRa_Rx_ESP_TxPin);
   SerialLoRa.end(); // end()を実行　←←追加
   delay(1000); // 1秒待つ　 ←←追加
   SerialLoRa.begin(LoRa_BaudRate, SERIAL_8N1, LoRa_Tx_ESP_RxPin,LoRa_Rx_ESP_TxPin);
   if(!bootCount){
-    lora.SwitchToConfigurationMode();
+    SwitchToConfigurationMode();
     while(!digitalRead(LoRa_AUXPin)){}
-    SerialMon.printf("I send conf\n\n");
+    SerialMon.printf("I send conf\r\n");
     for (size_t i = 0; i < sizeof(conf); i++)
     {
       
       SerialMon.printf(" %02x",conf[i]);
     }
-    for (size_t i = 0; i < sizeof(conf); i++)
-    {
-    SerialLoRa.write(conf[i]);
-    }
+    SerialLoRa.write((uint8_t *)&conf, sizeof(conf));
   }
-    // SerialLoRa.write((uint8_t *)&msg, sizeof(msg));
   SerialLoRa.flush();
   // ノーマルモード(M0=0,M1=0)へ移行する
-  lora.SwitchToNormalMode();
+  SwitchToNormalMode();
   while(!digitalRead(LoRa_AUXPin)){}
-  // timer = timerBegin(0, 80, true);                  //timer 0, div 80
-  // timerAttachInterrupt(timer, &resetModule, true);  //attach callback
-  // timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
-  // timerAlarmEnable(timer);                          //enable interrupt
-  // マルチタスク
-  // xTaskCreateUniversal(LoRaRecvTask, "LoRaRecvTask", 8192, NULL, 1, NULL,
-  //                      1);
-  // xTaskCreateUniversal(LoRaSendTask, "LoRaSendTask", 8192, NULL, 1, NULL,
-  //                      1);
-  timer = timerBegin(0, 80, true);                  //timer 0, div 80
-  timerAttachInterrupt(timer, &deep_sleep, true);  //attach callback
-  timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
-  timerAlarmEnable(timer);                          //enable interrupt
-  timerWrite(timer, 0);
   msg.myadress = OWN_ADDRESS;
   msg.temp = getTemp();
   // msg.temp = -127;
   msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
- 
   msg.bootcount = bootCount;
   SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
   SerialLoRa.flush();
-  uint8_t payload[]={0xff, 0xff, 0x00 ,msg.myadress & 0xff ,msg.myadress >> 8 ,msg.water &0xff, 0x00, msg.bootcount & 0xff, msg.bootcount >> 8, 0x00, 0x00 ,0xfe, 0xc2, 0x00, 0x00};
-  SerialMon.printf("I send data\n\n");
+  uint8_t payload[]={0xff, 0xff, 0x00 ,
+                    msg.myadress & 0xff ,msg.myadress >> 8 ,
+                    msg.water &0xff, 0x00,
+                    msg.bootcount & 0xff, msg.bootcount >> 8, 
+                    0x00, 0x00 ,0xfe, 0xc2, 0x00, 0x00};
+  SerialMon.printf("I send data\r\n");
   for (size_t i = 0; i < sizeof(payload); i++)
   {
     SerialMon.printf(" %02x",payload[i]);
   }
-  for (size_t i = 0; i < sizeof(payload); i++)
-  {
-    SerialLoRa.write(payload[i]);
-  }
-  // SerialLoRa.write((uint8_t *)&msg, sizeof(msg));
+  SerialMon.println();
+  SerialLoRa.write((uint8_t *)&payload, sizeof(payload));
   SerialLoRa.flush();
   delay(100);
 
-  // SerialLoRa.write((uint8_t *)payload, sizeof(payload));
-  // if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
-  //   delay(500);
-  //   SerialMon.printf("send succeeded.\n");
-  //   SerialMon.printf("\n");
-  // } else {
-  //   SerialMon.printf("send failed.\n");
-  //   SerialMon.printf("\n");
-  // }
-  
   #ifdef SECOND_ADDRESS
     timerWrite(timer, 0);
     delay(5000);
@@ -198,89 +177,24 @@ void setup() {
     SerialMon.println(SECOND_ADDRESS);
     SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
     SerialLoRa.flush();
-
-
-    uint8_t payload2[]={0xff, 0xff, 0x00 ,msg.myadress & 0xff ,msg.myadress >> 8 ,msg.water &0xff, 0x00, msg.bootcount & 0xff, msg.bootcount >> 8, 0x00, 0x00 ,0xfe, 0xc2, 0x00, 0x00};
+    uint8_t payload2[]={0xff, 0xff, 0x00 ,
+                      msg.myadress & 0xff ,msg.myadress >> 8 ,
+                      msg.water &0xff, 0x00, 
+                      msg.bootcount & 0xff, msg.bootcount >> 8, 
+                      0x00, 0x00 ,0xfe, 0xc2, 0x00, 0x00};
       SerialMon.printf("I send data\n\n");
       for (size_t i = 0; i < sizeof(payload2); i++)
     {
 
-    SerialMon.printf("%x",payload2[i]);
+    SerialMon.printf(" %02x",payload2[i]);
     }
-    for (size_t i = 0; i < sizeof(payload2); i++)
-    {
-
-    SerialLoRa.write(payload2[i]);
-    }
-      // SerialLoRa.write((uint8_t *)&msg, sizeof(msg));
-      SerialLoRa.flush();
-      delay(100);
-
+    SerialMon.println();
+    SerialLoRa.write((uint8_t *)&payload2, sizeof(payload2));
+    SerialLoRa.flush();
+    delay(100);
   #endif
 
   deep_sleep();
 }
 
-void loop() {
-
-}
-
-// void LoRaRecvTask(void *pvParameters) {
-//   while (1) {
-//     if (lora.RecieveFrame(&data) == 0) {
-//       digitalWrite(LED1 ,HIGH);
-//       delay(500);
-//       digitalWrite(LED1 ,LOW);
-//       SerialMon.printf("from ATOM recv data:\n");
-//       for (int i = 0; i < data.recv_data_len; i++) {
-//         SerialMon.printf("%02x", data.recv_data[i]);
-//       }
-//       SerialMon.printf("\n");
-//       SerialMon.printf("hex dump:\n");
-//       for (int i = 0; i < data.recv_data_len; i++) {
-//         SerialMon.printf("%02x ", data.recv_data[i]);
-//       }
-//       SerialMon.printf("\n");
-//       SerialMon.printf("RSSI: %d dBm\n", data.rssi);
-//       SerialMon.printf("\n");
-
-//       SerialMon.flush();
-      
-//       if ((data.recv_data[4]<<8 |data.recv_data[5]) == config.own_address){
-//         SerialMon.printf("response ok \n");
-//         delay(100);
-//         deep_sleep();
-//       }
-//     }
-
-//     delay(1);
-//   }
-// }
-
-// void LoRaSendTask(void *pvParameters) {
-//   while (1) {
-//     // lora.SwitchToNormalMode();
-//     msg.bootcount = bootCount;
-//     msg.myadress = config.own_address;
-//     msg.temp = getTemp();
-//     msg.water = bootCount % 100;//ここに水位
-//     SerialLoRa.flush();
-//     SerialMon.printf("I send data\n");
-//     digitalWrite(LED0 ,HIGH);
-//     if (lora.SendFrame(config, (uint8_t *)&msg, sizeof(msg)) == 0) {
-//       delay(500);
-//       SerialMon.printf("send succeeded.\n");
-//       digitalWrite(LED0 ,LOW);
-//       SerialMon.printf("\n");
-//     } else {
-//       SerialMon.printf("send failed.\n");
-//       SerialMon.printf("\n");
-//     }
-
-//     // SerialMon.flush();
-//     // lora.SwitchToConfigurationMode();
-    
-//     delay(30000);
-//     deep_sleep();
-//   }
-// }
+void loop() {}

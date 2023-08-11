@@ -14,8 +14,10 @@
 // E220-900T22S(JP)のbaud rate
 #define LoRa_BaudRate 9600
 
+
 #define OWN_ADDRESS 304
 #define SECOND_ADDRESS 305
+
 #define SW_LOW D0
 #define SW_HIGH D1
 #define SW_COM D2
@@ -43,6 +45,7 @@ struct  __attribute__((packed, aligned(4))) msgStruct{
   char conf_0 = 0xFF;
   char conf_1 = 0xFF;
   char channel = 0x01;
+
   uint16_t myadress = OWN_ADDRESS;
   uint16_t water ;
   uint16_t bootcount;
@@ -137,8 +140,10 @@ void setup() {
       SerialMon.printf(" %02x",conf[i]);
     }
     SerialLoRa.write((uint8_t *)&conf, sizeof(conf));
+
     delay(100);
     while(!digitalRead(LoRa_AUXPin)){}
+
   }
   SerialLoRa.flush();
   // ノーマルモード(M0=0,M1=0)へ移行する
@@ -151,7 +156,9 @@ void setup() {
   msg.bootcount = bootCount;
   SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
   SerialLoRa.flush();
+
   uint8_t payload[]={msg.conf_0, msg.conf_1, msg.channel ,
+
                     msg.myadress & 0xff ,msg.myadress >> 8 ,
                     msg.water &0xff, 0x00,
                     msg.bootcount & 0xff, msg.bootcount >> 8, 
@@ -179,6 +186,7 @@ void setup() {
     SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
     SerialLoRa.flush();
     uint8_t payload2[]={msg.conf_0, msg.conf_1, msg.channel ,
+
                       msg.myadress & 0xff ,msg.myadress >> 8 ,
                       msg.water &0xff, 0x00, 
                       msg.bootcount & 0xff, msg.bootcount >> 8, 

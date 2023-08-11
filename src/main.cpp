@@ -42,7 +42,7 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
 struct  __attribute__((packed, aligned(4))) msgStruct{ 
   char conf_0 = 0xFF;
   char conf_1 = 0xFF;
-  char channel = 0x01;
+  char channel = 0x00;
   uint16_t myadress = OWN_ADDRESS;
   uint16_t water ;
   uint16_t bootcount;

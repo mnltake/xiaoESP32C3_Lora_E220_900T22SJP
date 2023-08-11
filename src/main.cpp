@@ -14,8 +14,8 @@
 // E220-900T22S(JP)のbaud rate
 #define LoRa_BaudRate 9600
 
-#define OWN_ADDRESS 19
-// #define SECOND_ADDRESS 305
+#define OWN_ADDRESS 304
+#define SECOND_ADDRESS 305
 #define SW_LOW D0
 #define SW_HIGH D1
 #define SW_COM D2
@@ -42,7 +42,7 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
 struct  __attribute__((packed, aligned(4))) msgStruct{ 
   char conf_0 = 0xFF;
   char conf_1 = 0xFF;
-  char channel = 0x00;
+  char channel = 0x01;
   uint16_t myadress = OWN_ADDRESS;
   uint16_t water ;
   uint16_t bootcount;
@@ -124,9 +124,6 @@ void setup() {
   #endif
   
   // E220-900T22S(JP)へのLoRa初期設定
-  SerialLoRa.end(); // end()を実行　←←追加
-  delay(1000); // 1秒待つ　 ←←追加
-  SerialLoRa.begin(LoRa_BaudRate, SERIAL_8N1, LoRa_Tx_ESP_RxPin,LoRa_Rx_ESP_TxPin);
   SerialLoRa.end(); // end()を実行　←←追加
   delay(1000); // 1秒待つ　 ←←追加
   SerialLoRa.begin(LoRa_BaudRate, SERIAL_8N1, LoRa_Tx_ESP_RxPin,LoRa_Rx_ESP_TxPin);

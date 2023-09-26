@@ -14,14 +14,19 @@
 // E220-900T22S(JP)のbaud rate
 #define LoRa_BaudRate 9600
 
-#define OWN_ADDRESS 304
-#define SECOND_ADDRESS 305
+
+#define OWN_ADDRESS 131
+// #define SECOND_ADDRESS 305
+
 #define SW_LOW D0
 #define SW_HIGH D1
 #define SW_COM D2
 #define SECOND_SW_LOW D3
 #define SECOND_SW_HIGH D4
 #define SECOND_SW_COM D5
+#define SENSOR_GND D5
+#define SENSOR_3V3 D6
+#define SENSOR_DQ D3
 uint64_t sleepSec = 60*60 - 5;//実行時間5ｓ
 RTC_DATA_ATTR uint16_t bootCount = 0;
 
@@ -29,6 +34,12 @@ RTC_DATA_ATTR uint16_t bootCount = 0;
 #include "esp_system.h"
 const int wdtTimeout = 30*1000;  //time in ms to trigger the watchdog
 hw_timer_t *timer = NULL;
+
+//DS18B20
+#include <OneWire.h>
+#include <DallasTemperature.h>
+OneWire oneWire(SENSOR_DQ);
+DallasTemperature sensors(&oneWire);
 
 uint8_t conf[] ={0xc0, 0x00, 0x08, 
                 OWN_ADDRESS >> 8, //ADDH
@@ -70,13 +81,13 @@ void SwitchToConfigurationMode(void){
 }
 
 float getTemp(){
-  // digitalWrite (SENSOR_3V3 ,HIGH);
-  // delay(10);
-  // sensors.requestTemperatures(); 
-  // Serial.print("Temperature:");
-  // Serial.println(sensors.getTempCByIndex(0));
-  // return sensors.getTempCByIndex(0);
-  return -127;
+  digitalWrite (SENSOR_3V3 ,HIGH);
+  delay(10);
+  sensors.requestTemperatures(); 
+  Serial.print("Temperature:");
+  Serial.println(sensors.getTempCByIndex(0));
+  return sensors.getTempCByIndex(0);
+  // return -127;
 }
 
 void IRAM_ATTR deep_sleep(){
@@ -114,6 +125,9 @@ void setup() {
   pinMode( SW_HIGH ,INPUT_PULLUP);
   pinMode( SW_COM ,OUTPUT);
   digitalWrite ( SW_COM ,LOW);
+  pinMode( SENSOR_3V3 ,OUTPUT);
+  pinMode( SENSOR_GND ,OUTPUT);
+  digitalWrite ( SENSOR_GND ,LOW);
   pinMode(LoRa_ModeSettingPin_M0, OUTPUT);
   pinMode(LoRa_ModeSettingPin_M1, OUTPUT);
   #ifdef SECOND_ADDRESS
@@ -137,8 +151,10 @@ void setup() {
       SerialMon.printf(" %02x",conf[i]);
     }
     SerialLoRa.write((uint8_t *)&conf, sizeof(conf));
+
     delay(100);
     while(!digitalRead(LoRa_AUXPin)){}
+
   }
   SerialLoRa.flush();
   // ノーマルモード(M0=0,M1=0)へ移行する
@@ -146,16 +162,22 @@ void setup() {
   while(!digitalRead(LoRa_AUXPin)){}
   msg.myadress = OWN_ADDRESS;
   msg.temp = getTemp();
+  byte temperatureByteData[sizeof(float)];
+  memcpy(temperatureByteData, &msg.temp, sizeof(float));
   // msg.temp = -127;
   msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
   msg.bootcount = bootCount;
-  SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
+  Serial.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
   SerialLoRa.flush();
+
   uint8_t payload[]={msg.conf_0, msg.conf_1, msg.channel ,
+
                     msg.myadress & 0xff ,msg.myadress >> 8 ,
                     msg.water &0xff, 0x00,
                     msg.bootcount & 0xff, msg.bootcount >> 8, 
-                    0x00, 0x00 ,0xfe, 0xc2, 0x00, 0x00};
+                    temperatureByteData[0],temperatureByteData[1],temperatureByteData[2],temperatureByteData[3],
+                    0x00,0x00};
+  
   SerialMon.printf("I send data\r\n");
   for (size_t i = 0; i < sizeof(payload); i++)
   {
@@ -179,6 +201,7 @@ void setup() {
     SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
     SerialLoRa.flush();
     uint8_t payload2[]={msg.conf_0, msg.conf_1, msg.channel ,
+
                       msg.myadress & 0xff ,msg.myadress >> 8 ,
                       msg.water &0xff, 0x00, 
                       msg.bootcount & 0xff, msg.bootcount >> 8, 

@@ -1,8 +1,13 @@
 #include <Arduino.h>
+#include "Wire.h"
+#include <EEPROM.h>
 // Set serial for debug console (to the Serial Monitor)
 #define SerialMon Serial
 // Set serial for LoRa (to the module)
 #define SerialLoRa Serial1
+
+//I2C 
+#define I2C_DEV_ADDR 0x55
 
 // E220-900T22S(JP)へのピンアサイン
 #define LoRa_ModeSettingPin_M0 D7
@@ -14,19 +19,22 @@
 // E220-900T22S(JP)のbaud rate
 #define LoRa_BaudRate 9600
 
-
+int16_t senserID = -1;
 #define OWN_ADDRESS 131
 // #define SECOND_ADDRESS 305
 
 #define SW_LOW D0
 #define SW_HIGH D1
 #define SW_COM D2
-#define SECOND_SW_LOW D3
-#define SECOND_SW_HIGH D4
-#define SECOND_SW_COM D5
-#define SENSOR_GND D5
-#define SENSOR_3V3 D6
-#define SENSOR_DQ D3
+#define I2C_VCC D3
+#define I2C_SDA D4
+#define I2C_SCL D5
+// #define SECOND_SW_LOW D3
+// #define SECOND_SW_HIGH D6
+// #define SECOND_SW_COM D5
+// #define SENSOR_GND D5
+// #define SENSOR_3V3 D6
+// #define SENSOR_DQ D3
 uint64_t sleepSec = 60*60 - 5;//実行時間5ｓ
 RTC_DATA_ATTR uint16_t bootCount = 0;
 
@@ -36,10 +44,10 @@ const int wdtTimeout = 30*1000;  //time in ms to trigger the watchdog
 hw_timer_t *timer = NULL;
 
 //DS18B20
-#include <OneWire.h>
-#include <DallasTemperature.h>
-OneWire oneWire(SENSOR_DQ);
-DallasTemperature sensors(&oneWire);
+// #include <OneWire.h>
+// #include <DallasTemperature.h>
+// OneWire oneWire(SENSOR_DQ);
+// DallasTemperature sensors(&oneWire);
 
 uint8_t conf[] ={0xc0, 0x00, 0x08, 
                 OWN_ADDRESS >> 8, //ADDH
@@ -54,7 +62,7 @@ struct  __attribute__((packed, aligned(4))) msgStruct{
   char conf_0 = 0xFF;
   char conf_1 = 0xFF;
   char channel = 0x00;
-  uint16_t myadress = OWN_ADDRESS;
+  uint16_t myadress ;
   uint16_t water ;
   uint16_t bootcount;
   float temp  ;
@@ -79,15 +87,35 @@ void SwitchToConfigurationMode(void){
   digitalWrite(LoRa_ModeSettingPin_M1, 1);
   delay(100);
 }
+void onReceive(int len){
+  byte buf[2];
+  int j =0;
+  while(Wire.available()){
+    buf[j]=Wire.read();
+    SerialMon.printf("%02x ",buf[j]);
+    j++;
+  }
+    EEPROM.write(0, buf[0]);  
+    EEPROM.write(1, buf[1]);  
+    EEPROM.commit();
+  senserID = buf[0]<<8|buf[1];
+  SerialMon.printf("change sensorID: %d\n",senserID);
+  return ;
+}
 
+void getSensorID(){
+
+
+    return ;
+}
 float getTemp(){
-  digitalWrite (SENSOR_3V3 ,HIGH);
-  delay(10);
-  sensors.requestTemperatures(); 
-  Serial.print("Temperature:");
-  Serial.println(sensors.getTempCByIndex(0));
-  return sensors.getTempCByIndex(0);
-  // return -127;
+  // digitalWrite (SENSOR_3V3 ,HIGH);
+  // delay(10);
+  // sensors.requestTemperatures(); 
+  // Serial.print("Temperature:");
+  // Serial.println(sensors.getTempCByIndex(0));
+  // return sensors.getTempCByIndex(0);
+  return -127;
 }
 
 void IRAM_ATTR deep_sleep(){
@@ -125,9 +153,11 @@ void setup() {
   pinMode( SW_HIGH ,INPUT_PULLUP);
   pinMode( SW_COM ,OUTPUT);
   digitalWrite ( SW_COM ,LOW);
-  pinMode( SENSOR_3V3 ,OUTPUT);
-  pinMode( SENSOR_GND ,OUTPUT);
-  digitalWrite ( SENSOR_GND ,LOW);
+  pinMode( I2C_VCC ,OUTPUT);
+  digitalWrite ( I2C_VCC ,HIGH);
+  // pinMode( SENSOR_3V3 ,OUTPUT);
+  // pinMode( SENSOR_GND ,OUTPUT);
+  // digitalWrite ( SENSOR_GND ,LOW);
   pinMode(LoRa_ModeSettingPin_M0, OUTPUT);
   pinMode(LoRa_ModeSettingPin_M1, OUTPUT);
   #ifdef SECOND_ADDRESS
@@ -141,7 +171,17 @@ void setup() {
   SerialLoRa.end(); // end()を実行　←←追加
   delay(1000); // 1秒待つ　 ←←追加
   SerialLoRa.begin(LoRa_BaudRate, SERIAL_8N1, LoRa_Tx_ESP_RxPin,LoRa_Rx_ESP_TxPin);
+  Wire.begin((uint8_t)I2C_DEV_ADDR, I2C_SDA, I2C_SCL, 100000);
+  Wire.onReceive(onReceive);
+  EEPROM.begin(2);
   if(!bootCount){
+
+    delay(10000);
+
+    senserID = (EEPROM.read(0) >> 8) | EEPROM.read(1); 
+    SerialMon.printf("sensorID: %d\n",senserID);
+    msg.myadress =  senserID;
+    
     SwitchToConfigurationMode();
     while(!digitalRead(LoRa_AUXPin)){}
     SerialMon.printf("I send conf\r\n");
@@ -160,7 +200,7 @@ void setup() {
   // ノーマルモード(M0=0,M1=0)へ移行する
   SwitchToNormalMode();
   while(!digitalRead(LoRa_AUXPin)){}
-  msg.myadress = OWN_ADDRESS;
+  // msg.myadress = OWN_ADDRESS;
   msg.temp = getTemp();
   byte temperatureByteData[sizeof(float)];
   memcpy(temperatureByteData, &msg.temp, sizeof(float));

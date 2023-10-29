@@ -26,11 +26,11 @@ int16_t senserID = -1;
 #define SW_LOW D0
 #define SW_HIGH D1
 #define SW_COM D2
-#define I2C_VCC D3
+// #define I2C_VCC D3
 #define I2C_SDA D4
 #define I2C_SCL D5
-// #define SECOND_SW_LOW D3
-// #define SECOND_SW_HIGH D6
+#define SECOND_SW_LOW D3
+#define SECOND_SW_HIGH D6
 // #define SECOND_SW_COM D5
 // #define SENSOR_GND D5
 // #define SENSOR_3V3 D6
@@ -153,8 +153,8 @@ void setup() {
   pinMode( SW_HIGH ,INPUT_PULLUP);
   pinMode( SW_COM ,OUTPUT);
   digitalWrite ( SW_COM ,LOW);
-  pinMode( I2C_VCC ,OUTPUT);
-  digitalWrite ( I2C_VCC ,HIGH);
+  // pinMode( I2C_VCC ,OUTPUT);
+  // digitalWrite ( I2C_VCC ,HIGH);
   // pinMode( SENSOR_3V3 ,OUTPUT);
   // pinMode( SENSOR_GND ,OUTPUT);
   // digitalWrite ( SENSOR_GND ,LOW);
@@ -171,15 +171,15 @@ void setup() {
   SerialLoRa.end(); // end()を実行　←←追加
   delay(1000); // 1秒待つ　 ←←追加
   SerialLoRa.begin(LoRa_BaudRate, SERIAL_8N1, LoRa_Tx_ESP_RxPin,LoRa_Rx_ESP_TxPin);
-  Wire.begin((uint8_t)I2C_DEV_ADDR, I2C_SDA, I2C_SCL, 100000);
-  Wire.onReceive(onReceive);
+
   EEPROM.begin(2);
   if(!bootCount){
-
+  Wire.begin((uint8_t)I2C_DEV_ADDR, I2C_SDA, I2C_SCL, 100000);
+  Wire.onReceive(onReceive);
     delay(10000);
 
     senserID = (EEPROM.read(0) >> 8) | EEPROM.read(1); 
-    SerialMon.printf("sensorID: %d\n",senserID);
+    SerialMon.printf("\n sensorID: %d\n",senserID);
     msg.myadress =  senserID;
     
     SwitchToConfigurationMode();
@@ -200,7 +200,9 @@ void setup() {
   // ノーマルモード(M0=0,M1=0)へ移行する
   SwitchToNormalMode();
   while(!digitalRead(LoRa_AUXPin)){}
-  // msg.myadress = OWN_ADDRESS;
+  senserID = (EEPROM.read(0) >> 8) | EEPROM.read(1); 
+  SerialMon.printf("sensorID: %d\n",senserID);
+  msg.myadress =  senserID;
   msg.temp = getTemp();
   byte temperatureByteData[sizeof(float)];
   memcpy(temperatureByteData, &msg.temp, sizeof(float));

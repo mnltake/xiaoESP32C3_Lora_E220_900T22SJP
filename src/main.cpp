@@ -121,9 +121,9 @@ float getTemp(){
 void IRAM_ATTR deep_sleep(){
         SerialMon.printf("sleep \n");
         SwitchToConfigurationMode();
-        if (bootCount == 0){
-          delay(10000);
-        } 
+        // if (bootCount == 0){
+        //   delay(10000);
+        // } 
         if (bootCount < 10)
         {
           sleepSec = 25;
@@ -174,9 +174,9 @@ void setup() {
 
   EEPROM.begin(2);
   if(!bootCount){
-  Wire.begin((uint8_t)I2C_DEV_ADDR, I2C_SDA, I2C_SCL, 100000);
-  Wire.onReceive(onReceive);
-    delay(10000);
+    Wire.begin((uint8_t)I2C_DEV_ADDR, I2C_SDA, I2C_SCL, 100000);
+    Wire.onReceive(onReceive);
+    delay(20000);
 
     senserID = (EEPROM.read(0) >> 8) | EEPROM.read(1); 
     SerialMon.printf("\n sensorID: %d\n",senserID);

@@ -59,9 +59,9 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
                 0x00, //CRYPT
                 0x00};
 struct  __attribute__((packed, aligned(4))) msgStruct{ 
-  char conf_0 = 0xFF;//GateWay adress 0x0000
-  char conf_1 = 0xFF;
-  char channel = 0x09;
+  char targetAdressH = 0x00;//GateWay adress 0x0000
+  char targetAdressL = 0x00;
+  char targetChannel = 0x09;
   uint16_t myadress ;
   uint16_t water ;
   uint16_t bootcount;
@@ -263,7 +263,7 @@ void setup() {
   Serial.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
   SerialLoRa.flush();
 
-  uint8_t payload[]={msg.conf_0, msg.conf_1, msg.channel ,
+  uint8_t payload[]={msg.targetAdressH, msg.targetAdressL, msg.targetChannel ,
 
                     msg.myadress & 0xff ,msg.myadress >> 8 ,
                     msg.water &0xff, 0x00,
@@ -293,7 +293,7 @@ void setup() {
     SerialMon.println(SECOND_ADDRESS);
     SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
     SerialLoRa.flush();
-    uint8_t payload2[]={msg.conf_0, msg.conf_1, msg.channel ,
+    uint8_t payload2[]={msg.targetAdressH, msg.targetAdressL, msg.targetChannel ,
 
                       msg.myadress & 0xff ,msg.myadress >> 8 ,
                       msg.water &0xff, 0x00, 

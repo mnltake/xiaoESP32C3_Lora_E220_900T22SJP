@@ -12,8 +12,8 @@
 // E220-900T22S(JP)へのピンアサイン
 #define LoRa_ModeSettingPin_M0 GPIO_NUM_2//D0 =GPIO2
 #define LoRa_ModeSettingPin_M1 GPIO_NUM_3//D1 =GPIO3
-#define LoRa_Rx_ESP_TxPin D8
-#define LoRa_Tx_ESP_RxPin D9
+#define LoRa_Rx_ESP_TxPin D6
+#define LoRa_Tx_ESP_RxPin D7
 #define LoRa_AUXPin GPIO_NUM_4//D2
 
 // E220-900T22S(JP)のbaud rate
@@ -23,13 +23,13 @@ int16_t senserID = -1;
 #define OWN_ADDRESS 131
 // #define SECOND_ADDRESS 305
 
-#define SW_LOW D4
-#define SW_HIGH D5
-#define SW_COM D6
-// #define I2C_VCC D3
-// #define I2C_SDA D4
-// #define I2C_SCL D5
-#define SECOND_SW_LOW D3
+#define SW_LOW D8
+#define SW_HIGH D9
+// #define SW_COM D10
+#define I2C_VCC D3
+#define I2C_SDA D4
+#define I2C_SCL D5
+// #define SECOND_SW_LOW D3
 // #define SECOND_SW_HIGH D6
 // #define SECOND_SW_COM D5
 // #define SENSOR_GND D5
@@ -250,7 +250,39 @@ void setup() {
   // ノーマルモード(M0=0,M1=0)へ移行する
   SwitchToNormalMode();
   while(!digitalRead(LoRa_AUXPin)){}
+  delay(3000);
+  senserID = (EEPROM.read(0) >> 8) | EEPROM.read(1); 
+  SerialMon.printf("sensorID: %d\n",senserID);
+  msg.myadress =  senserID ;
+  msg.temp = getTemp();
+  byte temperatureByteData[sizeof(float)];
+  memcpy(temperatureByteData, &msg.temp, sizeof(float));
+  // msg.temp = -127;
+  msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
+  msg.bootcount = bootCount;
+  Serial.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
+  SerialLoRa.flush();
 
+  uint8_t payload[]={msg.targetAdressH, msg.targetAdressL, msg.targetChannel ,
+
+                    msg.myadress & 0xff ,msg.myadress >> 8 ,
+                    msg.water &0xff, 0x00,
+                    msg.bootcount & 0xff, msg.bootcount >> 8, 
+                    temperatureByteData[0],temperatureByteData[1],temperatureByteData[2],temperatureByteData[3],
+                    0x00,0x00};
+  
+  SerialMon.printf("I send data\r\n");
+  for (size_t i = 0; i < sizeof(payload); i++)
+  {
+    SerialMon.printf(" %02x",payload[i]);
+  }
+  SerialMon.println();
+  SerialLoRa.write((uint8_t *)&payload, sizeof(payload));
+  SerialLoRa.flush();
+  delay(100);
+
+  bootCount++;
+  deep_sleep();
 
   #ifdef SECOND_ADDRESS
     timerWrite(timer, 0);
@@ -286,39 +318,5 @@ void setup() {
 }
 
 void loop() {
-  for(int j=0 ;j<10;j++){
-  delay(3000);
-  // senserID = (EEPROM.read(0) >> 8) | EEPROM.read(1); 
-  SerialMon.printf("sensorID: %d\n",senserID);
-  msg.myadress =  senserID +j;
-  msg.temp = getTemp();
-  byte temperatureByteData[sizeof(float)];
-  memcpy(temperatureByteData, &msg.temp, sizeof(float));
-  // msg.temp = -127;
-  msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
-  msg.bootcount = bootCount;
-  Serial.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
-  SerialLoRa.flush();
-
-  uint8_t payload[]={msg.targetAdressH, msg.targetAdressL, msg.targetChannel ,
-
-                    msg.myadress & 0xff ,msg.myadress >> 8 ,
-                    msg.water &0xff, 0x00,
-                    msg.bootcount & 0xff, msg.bootcount >> 8, 
-                    temperatureByteData[0],temperatureByteData[1],temperatureByteData[2],temperatureByteData[3],
-                    0x00,0x00};
-  
-  SerialMon.printf("I send data\r\n");
-  for (size_t i = 0; i < sizeof(payload); i++)
-  {
-    SerialMon.printf(" %02x",payload[i]);
-  }
-  SerialMon.println();
-  SerialLoRa.write((uint8_t *)&payload, sizeof(payload));
-  SerialLoRa.flush();
-  delay(100);
-  }
-  bootCount++;
-  deep_sleep();
 }
 

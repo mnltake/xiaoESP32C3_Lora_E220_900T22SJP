@@ -40,7 +40,7 @@ RTC_DATA_ATTR uint16_t bootCount = 0;
 esp_sleep_source_t  wakeup_reason;
 //WDT
 #include "esp_system.h"
-const int wdtTimeout = 30*1000;  //time in ms to trigger the watchdog
+const int wdtTimeout = 60*1000;  //time in ms to trigger the watchdog
 hw_timer_t *timer = NULL;
 
 //DS18B20
@@ -199,12 +199,12 @@ void setup() {
     senserID = OWN_ADDRESS; 
     SerialMon.printf("\n sensorID: %d\n",senserID);
     msg.myadress =  senserID;
-    delay(1000);
+    delay(100);
   }else{
     Serial.println("Waked up from nomal power on!");
     // Wire.begin((uint8_t)I2C_DEV_ADDR, I2C_SDA, I2C_SCL, 100000);
     // Wire.onReceive(onReceive);
-    delay(20000);
+    delay(10000);
 
     // senserID = (EEPROM.read(0) << 8) | EEPROM.read(1); 
     senserID = OWN_ADDRESS; 
@@ -250,36 +250,7 @@ void setup() {
   // ノーマルモード(M0=0,M1=0)へ移行する
   SwitchToNormalMode();
   while(!digitalRead(LoRa_AUXPin)){}
-  delay(10000);
-  // senserID = (EEPROM.read(0) >> 8) | EEPROM.read(1); 
-  SerialMon.printf("sensorID: %d\n",senserID);
-  msg.myadress =  senserID;
-  msg.temp = getTemp();
-  byte temperatureByteData[sizeof(float)];
-  memcpy(temperatureByteData, &msg.temp, sizeof(float));
-  // msg.temp = -127;
-  msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
-  msg.bootcount = bootCount;
-  Serial.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
-  SerialLoRa.flush();
 
-  uint8_t payload[]={msg.targetAdressH, msg.targetAdressL, msg.targetChannel ,
-
-                    msg.myadress & 0xff ,msg.myadress >> 8 ,
-                    msg.water &0xff, 0x00,
-                    msg.bootcount & 0xff, msg.bootcount >> 8, 
-                    temperatureByteData[0],temperatureByteData[1],temperatureByteData[2],temperatureByteData[3],
-                    0x00,0x00};
-  
-  SerialMon.printf("I send data\r\n");
-  for (size_t i = 0; i < sizeof(payload); i++)
-  {
-    SerialMon.printf(" %02x",payload[i]);
-  }
-  SerialMon.println();
-  SerialLoRa.write((uint8_t *)&payload, sizeof(payload));
-  SerialLoRa.flush();
-  delay(100);
 
   #ifdef SECOND_ADDRESS
     timerWrite(timer, 0);
@@ -311,7 +282,43 @@ void setup() {
     delay(100);
   #endif
 
+ 
+}
+
+void loop() {
+  for(int j=0 ;j<10;j++){
+  delay(3000);
+  // senserID = (EEPROM.read(0) >> 8) | EEPROM.read(1); 
+  SerialMon.printf("sensorID: %d\n",senserID);
+  msg.myadress =  senserID +j;
+  msg.temp = getTemp();
+  byte temperatureByteData[sizeof(float)];
+  memcpy(temperatureByteData, &msg.temp, sizeof(float));
+  // msg.temp = -127;
+  msg.water = digitalRead( SW_LOW) * 49 + digitalRead( SW_HIGH) * 51; //ここに水位
+  msg.bootcount = bootCount;
+  Serial.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
+  SerialLoRa.flush();
+
+  uint8_t payload[]={msg.targetAdressH, msg.targetAdressL, msg.targetChannel ,
+
+                    msg.myadress & 0xff ,msg.myadress >> 8 ,
+                    msg.water &0xff, 0x00,
+                    msg.bootcount & 0xff, msg.bootcount >> 8, 
+                    temperatureByteData[0],temperatureByteData[1],temperatureByteData[2],temperatureByteData[3],
+                    0x00,0x00};
+  
+  SerialMon.printf("I send data\r\n");
+  for (size_t i = 0; i < sizeof(payload); i++)
+  {
+    SerialMon.printf(" %02x",payload[i]);
+  }
+  SerialMon.println();
+  SerialLoRa.write((uint8_t *)&payload, sizeof(payload));
+  SerialLoRa.flush();
+  delay(100);
+  }
+  bootCount++;
   deep_sleep();
 }
 
-void loop() {}

@@ -55,7 +55,7 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
                 0b01110000, // baud_rate 9600 bps  SF:9 BW:125
                 0b11100000, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 13 dBm
                 0x09, //own_channel
-                0b10000011, //RSSI on ,fix mode,wor_cycle 2000 ms
+                0b10000101, //RSSI on ,fix mode,wor_cycle 2000 ms
                 0x00, //CRYPT
                 0x00};
 struct  __attribute__((packed, aligned(4))) msgStruct{ 

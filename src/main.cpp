@@ -202,11 +202,11 @@ void setup() {
     delay(100);
   }else{
     Serial.println("Waked up from nomal power on!");
-    // Wire.begin((uint8_t)I2C_DEV_ADDR, I2C_SDA, I2C_SCL, 100000);
-    // Wire.onReceive(onReceive);
+    Wire.begin((uint8_t)I2C_DEV_ADDR, I2C_SDA, I2C_SCL, 100000);
+    Wire.onReceive(onReceive);
     delay(10000);
 
-    // senserID = (EEPROM.read(0) << 8) | EEPROM.read(1); 
+    senserID = (EEPROM.read(0) << 8) | EEPROM.read(1); 
     senserID = OWN_ADDRESS; 
     SerialMon.printf("\n sensorID: %d\n",senserID);
     msg.myadress =  senserID;

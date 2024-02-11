@@ -8,7 +8,8 @@
 #define SerialMon Serial
 // Set serial for LoRa (to the module)
 #define SerialLoRa Serial1
-
+#define LTEGW 
+// #define WIFIGW 
 //I2C 
 #define I2C_DEV_ADDR 0x55
 
@@ -32,10 +33,16 @@
 #define L2 D3
 #define H2 D8
 
-// uint64_t sleepSec = 60*60 - 5;//実行時間5ｓ
+#ifdef LTEGW
+uint8_t loraChannel = 0x09;
+#endif
+#ifdef WIFIGW
+uint8_t loraChannel = 0x01;
+#endif
 RTC_DATA_ATTR int16_t senserID = -1;
 RTC_DATA_ATTR uint16_t bootCount = 0;
 uint16_t waitmillsec = senserID*30 + bootCount;
+uint64_t sleepSec = 60*60-5;
 esp_sleep_source_t  wakeup_reason;
 //WDT
 #include "esp_system.h"
@@ -47,14 +54,17 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
                 senserID & 0xff, //ADDL
                 0b01110000, // baud_rate 115200 bps  SF:9 BW:125
                 0b11100000, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 13 dBm
-                0x09, //own_channel
+                loraChannel, //own_channel
                 0b11000111, //RSSI on ,fix mode,wor_cycle 4000 ms
                 0x00, //CRYPT
                 0x00};
+
+
+
 struct  __attribute__((packed, aligned(4))) msgStruct{ 
   char targetAdressH = 0x00;//GateWay adress 0x0000
   char targetAdressL = 0x00;
-  char targetChannel = 0x09;
+  char targetChannel = loraChannel;
   uint16_t myadress ;
   uint16_t water ;
   uint16_t bootcount;
@@ -164,31 +174,24 @@ float getTemp(){
 }
 
 void IRAM_ATTR deep_sleep(){
-    SwitchToWORReceivingMode();
-		delay(100);
-    Serial.println();
-		if (ESP_OK == gpio_hold_en(LoRa_ModeSettingPin_M0)){
-			Serial.println("HOLD LoRa_ModeSettingPin_M0");
-		}else{
-			Serial.println("NO HOLD LoRa_ModeSettingPin_M0");
-		}
-		if (ESP_OK == gpio_hold_en(LoRa_ModeSettingPin_M1)){
-				Serial.println("HOLD LoRa_ModeSettingPin_M1");
-			}else{
-				Serial.println("NO HOLD 1LoRa_ModeSettingPin_M1");
-			}
-    if(esp_sleep_is_valid_wakeup_gpio(LoRa_AUXPin)){
+    #ifdef LTEGW
+      SwitchToWORReceivingMode();
+      delay(100);
       esp_deep_sleep_enable_gpio_wakeup(BIT(4), ESP_GPIO_WAKEUP_GPIO_LOW);
-      gpio_deep_sleep_hold_en();
-      //Go to sleep now
-      Serial.println("Going to sleep now");
-      delay(1000);
-      esp_deep_sleep_start();
-    }else{
-      Serial.println("NG pin");
-    }
-
+    #endif
+    #ifdef WIFIGW
+    SwitchToConfigurationMode();
+     	esp_sleep_enable_timer_wakeup(sleepSec * 1000 * 1000);
+    #endif
+    gpio_hold_en(LoRa_ModeSettingPin_M0);
+    gpio_hold_en(LoRa_ModeSettingPin_M1);
+    gpio_deep_sleep_hold_en();
+    Serial.println();
+    Serial.println("Going to sleep now");
+    delay(1000);
+    esp_deep_sleep_start();
 }
+
 void wakeup_cause_print() {
   esp_sleep_wakeup_cause_t wakeup_reason;
   wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -233,9 +236,16 @@ void setup() {
     gpio_deep_sleep_hold_dis();
     SwitchToConfigurationMode();//boot text clear
     SwitchToNormalMode();
-    // senserID = OWN_ADDRESS; 
     SerialMon.printf("\n sensorID: %d\n",senserID);
-    msg.myadress =  senserID;
+    // msg.myadress =  senserID;
+    delay(100);
+  }else if (ESP_SLEEP_WAKEUP_TIMER == wakeup_reason) {
+    Serial.println("Waked up from TIMER!");
+    gpio_hold_dis(LoRa_ModeSettingPin_M0);
+    gpio_hold_dis(LoRa_ModeSettingPin_M1);
+    gpio_deep_sleep_hold_dis();
+    SwitchToConfigurationMode();//boot text clear
+    SwitchToNormalMode();
     delay(100);
   }else{
     Serial.println("Waked up from nomal power on!");
@@ -269,7 +279,6 @@ void setup() {
     deep_sleep();
   }
 
-//	delay(1000);
   Serial.println("Wake and start ");
   pinMode( L1 ,INPUT_PULLUP);
   pinMode( H1 ,INPUT_PULLUP);
@@ -279,53 +288,11 @@ void setup() {
     pinMode( H2 ,INPUT_PULLUP);
   #endif
   
-
-  // SerialLoRa.flush();
-  // ノーマルモード(M0=0,M1=0)へ移行する
-  // SwitchToNormalMode();
-  // while(!digitalRead(LoRa_AUXPin)){}
-  // delay(1000);
-  // SerialLoRa.write(0x00);
-  // SerialLoRa.flush();
-  #ifdef SECOND_ADDRESS
-    timerWrite(timer, 0);
-    delay(5000);
-    timerWrite(timer, 0);
-    msg.myadress = SECOND_ADDRESS;
-    msg.temp = getTemp();
-    // msg.temp = -127;
-    msg.water = digitalRead( L2) * 49 + digitalRead( H2) * 51; //ここに水位
-    msg.bootcount = bootCount;
-    SerialMon.println(SECOND_ADDRESS);
-    SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
-    SerialLoRa.flush();
-    uint8_t payload2[]={msg.targetAdressH, msg.targetAdressL, msg.targetChannel ,
-
-                      msg.myadress & 0xff ,msg.myadress >> 8 ,
-                      msg.water &0xff, 0x00, 
-                      msg.bootcount & 0xff, msg.bootcount >> 8, 
-                      0x00, 0x00 ,0xfe, 0xc2, 0x00, 0x00};
-      SerialMon.printf("I send data\n\n");
-      for (size_t i = 0; i < sizeof(payload2); i++)
-    {
-
-    SerialMon.printf(" %02x",payload2[i]);
-    }
-    SerialMon.println();
-    SerialLoRa.write((uint8_t *)&payload2, sizeof(payload2));
-    SerialLoRa.flush();
-    delay(100);
-  #endif
-
-  // delay(500);
-  // SerialLoRa.flush();
-  // // ノーマルモード(M0=0,M1=0)へ移行する
-  // SwitchToNormalMode();
-  // while(!digitalRead(LoRa_AUXPin)){}
-
+  #ifdef LTEGW
   delay(waitmillsec);//他と重ならない秒数
   SerialMon.printf("waitmillsec: %d\n",waitmillsec);
-  // senserID = (EEPROM.read(0) >> 8) | EEPROM.read(1); 
+  #endif
+
   SerialMon.printf("sensorID: %d\n",senserID);
   msg.myadress =  senserID ;
   msg.temp = getTemp();
@@ -354,9 +321,6 @@ void setup() {
   SerialLoRa.write((uint8_t *)&payload, sizeof(payload));
   SerialLoRa.flush();
   delay(100);
-
-  bootCount++;
-  deep_sleep();
 
   #ifdef SECOND_ADDRESS
     timerWrite(timer, 0);
@@ -388,7 +352,8 @@ void setup() {
     delay(100);
   #endif
 
- 
+  bootCount++;
+  deep_sleep();
 }
 
 void loop() {

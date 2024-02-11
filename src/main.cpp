@@ -53,7 +53,7 @@
 RTC_DATA_ATTR int16_t senserID = -1;
 RTC_DATA_ATTR uint16_t bootCount = 0;
 uint16_t waitmillsec = senserID*30 + bootCount;
-uint64_t sleepSec = 60*60-5;
+uint64_t sleepSec = 60*60;
 esp_sleep_source_t  wakeup_reason;
 
 #ifdef LTEGW
@@ -76,7 +76,7 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
                 0b01110000, // baud_rate 115200 bps  SF:9 BW:125
                 0b11100000, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 13 dBm
                 loraChannel, //own_channel
-                0b10000111, //RSSI on ,fix mode,wor_cycle 4000 ms
+                0b10000111, //RSSI on ,no fix mode,wor_cycle 4000 ms
                 0x00, //CRYPT
                 0x00};
 #endif
@@ -212,7 +212,7 @@ void IRAM_ATTR deep_sleep(){
       if (bootCount < 10) {
         sleepSec = 25;
       }
-     	esp_sleep_enable_timer_wakeup(sleepSec * 1000 * 1000);
+     	esp_sleep_enable_timer_wakeup(sleepSec * 1000 * 1000 - micros());
     #endif
     gpio_hold_en(LoRa_ModeSettingPin_M0);
     gpio_hold_en(LoRa_ModeSettingPin_M1);

@@ -10,16 +10,25 @@
 #define SerialLoRa Serial1
 #define LTEGW 
 // #define WIFIGW 
+#define PCB
+
 //I2C 
 #define I2C_DEV_ADDR 0x55
 
 // E220-900T22S(JP)へのピンアサイン
-#define LoRa_ModeSettingPin_M0 GPIO_NUM_2//D0 =GPIO2
-#define LoRa_ModeSettingPin_M1 GPIO_NUM_3//D1 =GPIO3
-#define LoRa_Rx_ESP_TxPin D6
-#define LoRa_Tx_ESP_RxPin D7
-#define LoRa_AUXPin GPIO_NUM_4//D2
-
+#ifdef PCB
+  #define LoRa_ModeSettingPin_M0 GPIO_NUM_2//D0 =GPIO2
+  #define LoRa_ModeSettingPin_M1 GPIO_NUM_3//D1 =GPIO3
+  #define LoRa_Rx_ESP_TxPin D6
+  #define LoRa_Tx_ESP_RxPin D7
+  #define LoRa_AUXPin GPIO_NUM_4//D2
+#else
+  #define LoRa_ModeSettingPin_M0 GPIO_NUM_2//D0 =GPIO2
+  #define LoRa_ModeSettingPin_M1 GPIO_NUM_3//D1 =GPIO3
+  #define LoRa_Rx_ESP_TxPin D6
+  #define LoRa_Tx_ESP_RxPin D7
+  #define LoRa_AUXPin GPIO_NUM_4//D2
+#endif
 // E220-900T22S(JP)のbaud rate
 #define LoRa_BaudRate 9600
 

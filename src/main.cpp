@@ -1,5 +1,8 @@
 #include <Arduino.h>
-#include "Wire.h"
+// #include "Wire.h"
+#include <esp_now.h>
+#include <esp_sleep.h>
+#include <WiFi.h>
 #include <EEPROM.h>
 // Set serial for debug console (to the Serial Monitor)
 #define SerialMon Serial
@@ -84,21 +87,69 @@ void SwitchToConfigurationMode(void){
   digitalWrite(LoRa_ModeSettingPin_M1, 1);
   delay(100);
 }
-void onReceive(int len){
-  byte buf[2];
-  int j =0;
-  while(Wire.available()){
-    buf[j]=Wire.read();
-    SerialMon.printf("%02x ",buf[j]);
-    j++;
+
+#define CHANNEL 1
+// Init ESP Now with fallback
+void InitESPNow() {
+  WiFi.disconnect();
+  if (esp_now_init() == ESP_OK) {
+    Serial.println("ESPNow Init Success");
   }
-    EEPROM.write(0, buf[0]);  //ADDH
-    EEPROM.write(1, buf[1]);  //ADDL
-    EEPROM.commit();
-  senserID = buf[0]<<8 | buf[1];
+  else {
+    Serial.println("ESPNow Init Failed");
+    // Retry InitESPNow, add a counte and then restart?
+    // InitESPNow();
+    // or Simply Restart
+    ESP.restart();
+  }
+}
+
+// config AP SSID
+void configDeviceAP() {
+  const char *SSID = "Slave_1";
+  bool result = WiFi.softAP(SSID, "Slave_1_Password", CHANNEL, 0);
+  if (!result) {
+    Serial.println("AP Config failed.");
+  } else {
+    Serial.println("AP Config Success. Broadcasting with AP: " + String(SSID));
+    Serial.print("AP CHANNEL "); Serial.println(WiFi.channel());
+  }
+}
+// callback when data is recv from Master
+void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
+  char macStr[18];
+  snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
+           mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+  Serial.print("Last Packet Recv from: "); Serial.println(macStr);
+  Serial.print("Last Packet Recv Data: "); Serial.println(*data);
+  Serial.println("");
+  EEPROM.write(0, data[0]);  //ADDH
+  EEPROM.write(1, data[1]);  //ADDL
+  EEPROM.commit();
+  senserID = data[0]<<8 | data[1];
   SerialMon.printf("change sensorID: %d\n",senserID);
+  Serial.print("Sending: "); 
+  uint8_t res[2] = {0x4f,0x4b};
+  esp_err_t result = esp_now_send(mac_addr, res, sizeof(res));
+
   return ;
 }
+
+// void onReceive(int len){
+//   byte buf[2];
+//   int j =0;
+//   while(Wire.available()){
+//     buf[j]=Wire.read();
+//     SerialMon.printf("%02x ",buf[j]);
+//     j++;
+//   }
+//     EEPROM.write(0, buf[0]);  //ADDH
+//     EEPROM.write(1, buf[1]);  //ADDL
+//     EEPROM.commit();
+//   senserID = buf[0]<<8 | buf[1];
+//   SerialMon.printf("change sensorID: %d\n",senserID);
+//   return ;
+// }
 
 void getSensorID(){
 
@@ -191,10 +242,24 @@ void setup() {
     delay(100);
   }else{
     Serial.println("Waked up from nomal power on!");
-    Wire.begin((uint8_t)I2C_DEV_ADDR, I2C_SDA, I2C_SCL, 100000);
-    Wire.onReceive(onReceive);
-    delay(20000);
+    //Set device in AP mode to begin with
+    WiFi.mode(WIFI_AP);
+    // configure device AP mode
+    configDeviceAP();
+    // This is the mac address of the Slave in AP Mode
+    Serial.print("AP MAC: "); Serial.println(WiFi.softAPmacAddress());
+    // Init ESPNow with a fallback logic
+    InitESPNow();
+    // Once ESPNow is successfully Init, we will register for recv CB to
+    // get recv packer info.
+    esp_now_register_recv_cb(OnDataRecv);
 
+
+
+    // Wire.begin((uint8_t)I2C_DEV_ADDR, I2C_SDA, I2C_SCL, 100000);
+    // Wire.onReceive(onReceive);
+    delay(20000);
+	  WiFi.enableSTA(false);
     senserID = (EEPROM.read(0) << 8) | EEPROM.read(1); 
     // senserID = OWN_ADDRESS; 
     SerialMon.printf("\n sensorID: %d\n",senserID);

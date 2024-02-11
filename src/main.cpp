@@ -21,8 +21,8 @@
 
 // E220-900T22S(JP)のbaud rate
 #define LoRa_BaudRate 9600
-RTC_DATA_ATTR int16_t senserID = -1;
-#define OWN_ADDRESS 160
+
+// #define OWN_ADDRESS 160
 // #define SECOND_ADDRESS 305
 
 #define L1 D9
@@ -33,6 +33,7 @@ RTC_DATA_ATTR int16_t senserID = -1;
 #define H2 D8
 
 // uint64_t sleepSec = 60*60 - 5;//実行時間5ｓ
+RTC_DATA_ATTR int16_t senserID = -1;
 RTC_DATA_ATTR uint16_t bootCount = 0;
 uint16_t waitmillsec = senserID*30 + bootCount;
 esp_sleep_source_t  wakeup_reason;
@@ -251,7 +252,7 @@ void setup() {
     senserID = (EEPROM.read(0) << 8) | EEPROM.read(1); 
     // senserID = OWN_ADDRESS; 
     SerialMon.printf("\n sensorID: %d\n",senserID);
-    msg.myadress =  senserID;
+    // msg.myadress =  senserID;
     
     SwitchToConfigurationMode();
     while(!digitalRead(LoRa_AUXPin)){}
@@ -316,15 +317,15 @@ void setup() {
     delay(100);
   #endif
 
-  delay(500);
-  SerialLoRa.flush();
-  // ノーマルモード(M0=0,M1=0)へ移行する
-  SwitchToNormalMode();
-  while(!digitalRead(LoRa_AUXPin)){}
+  // delay(500);
+  // SerialLoRa.flush();
+  // // ノーマルモード(M0=0,M1=0)へ移行する
+  // SwitchToNormalMode();
+  // while(!digitalRead(LoRa_AUXPin)){}
 
   delay(waitmillsec);//他と重ならない秒数
   SerialMon.printf("waitmillsec: %d\n",waitmillsec);
-  senserID = (EEPROM.read(0) >> 8) | EEPROM.read(1); 
+  // senserID = (EEPROM.read(0) >> 8) | EEPROM.read(1); 
   SerialMon.printf("sensorID: %d\n",senserID);
   msg.myadress =  senserID ;
   msg.temp = getTemp();

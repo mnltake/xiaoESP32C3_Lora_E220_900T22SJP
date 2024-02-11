@@ -8,9 +8,9 @@
 #define SerialMon Serial
 // Set serial for LoRa (to the module)
 #define SerialLoRa Serial1
-#define LTEGW 
-// #define WIFIGW 
-#define PCB
+// #define LTEGW 
+#define WIFIGW 
+// #define PCB
 
 //I2C 
 #define I2C_DEV_ADDR 0x55
@@ -22,12 +22,25 @@
   #define LoRa_Rx_ESP_TxPin D6
   #define LoRa_Tx_ESP_RxPin D7
   #define LoRa_AUXPin GPIO_NUM_4//D2
+  #define L1 D9
+  #define H1 D10
+  #define I2C_SDA D4
+  #define I2C_SCL D5
+  #define L2 D3
+  #define H2 D8
 #else
-  #define LoRa_ModeSettingPin_M0 GPIO_NUM_2//D0 =GPIO2
-  #define LoRa_ModeSettingPin_M1 GPIO_NUM_3//D1 =GPIO3
-  #define LoRa_Rx_ESP_TxPin D6
-  #define LoRa_Tx_ESP_RxPin D7
-  #define LoRa_AUXPin GPIO_NUM_4//D2
+  #define LoRa_ModeSettingPin_M0 GPIO_NUM_20//D7
+  #define LoRa_ModeSettingPin_M1 GPIO_NUM_20//D7
+  #define LoRa_Rx_ESP_TxPin D8
+  #define LoRa_Tx_ESP_RxPin D9
+  #define LoRa_AUXPin D10
+  #define L1 D0
+  #define H1 D1
+  #define SW_COM D2
+  #define I2C_SDA D4
+  #define I2C_SCL D5
+  #define L2 D3
+  #define H2 D6
 #endif
 // E220-900T22S(JP)のbaud rate
 #define LoRa_BaudRate 9600
@@ -35,29 +48,16 @@
 // #define OWN_ADDRESS 160
 // #define SECOND_ADDRESS 305
 
-#define L1 D9
-#define H1 D10
-#define I2C_SDA D4
-#define I2C_SCL D5
-#define L2 D3
-#define H2 D8
 
-#ifdef LTEGW
-uint8_t loraChannel = 0x09;
-#endif
-#ifdef WIFIGW
-uint8_t loraChannel = 0x01;
-#endif
+
 RTC_DATA_ATTR int16_t senserID = -1;
 RTC_DATA_ATTR uint16_t bootCount = 0;
 uint16_t waitmillsec = senserID*30 + bootCount;
 uint64_t sleepSec = 60*60-5;
 esp_sleep_source_t  wakeup_reason;
-//WDT
-#include "esp_system.h"
-const int wdtTimeout = 60*1000;  //time in ms to trigger the watchdog sec
-hw_timer_t *timer = NULL;
 
+#ifdef LTEGW
+uint8_t loraChannel = 0x09;
 uint8_t conf[] ={0xc0, 0x00, 0x08, 
                 senserID >> 8, //ADDH
                 senserID & 0xff, //ADDL
@@ -67,6 +67,25 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
                 0b11000111, //RSSI on ,fix mode,wor_cycle 4000 ms
                 0x00, //CRYPT
                 0x00};
+#endif
+#ifdef WIFIGW
+uint8_t loraChannel = 0x00;
+uint8_t conf[] ={0xc0, 0x00, 0x08, 
+                senserID >> 8, //ADDH
+                senserID & 0xff, //ADDL
+                0b01110000, // baud_rate 115200 bps  SF:9 BW:125
+                0b11100000, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 13 dBm
+                loraChannel, //own_channel
+                0b10000111, //RSSI on ,fix mode,wor_cycle 4000 ms
+                0x00, //CRYPT
+                0x00};
+#endif
+//WDT
+#include "esp_system.h"
+const int wdtTimeout = 60*1000;  //time in ms to trigger the watchdog sec
+hw_timer_t *timer = NULL;
+
+
 
 
 
@@ -189,7 +208,10 @@ void IRAM_ATTR deep_sleep(){
       esp_deep_sleep_enable_gpio_wakeup(BIT(4), ESP_GPIO_WAKEUP_GPIO_LOW);
     #endif
     #ifdef WIFIGW
-    SwitchToConfigurationMode();
+      SwitchToConfigurationMode();
+      if (bootCount < 10) {
+        sleepSec = 25;
+      }
      	esp_sleep_enable_timer_wakeup(sleepSec * 1000 * 1000);
     #endif
     gpio_hold_en(LoRa_ModeSettingPin_M0);
@@ -222,6 +244,10 @@ void wakeup_cause_print() {
   }
 }
 void setup() {
+  #ifndef PCB
+    digitalWrite ( SW_COM ,LOW);
+    pinMode( SW_COM ,OUTPUT);
+  #endif
   pinMode(LoRa_ModeSettingPin_M0, OUTPUT);
   pinMode(LoRa_ModeSettingPin_M1, OUTPUT);
   timer = timerBegin(0, 80, true);                  //timer 0, div 80

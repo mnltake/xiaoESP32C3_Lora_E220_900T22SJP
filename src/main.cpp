@@ -128,10 +128,6 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   EEPROM.commit();
   senserID = data[0]<<8 | data[1];
   SerialMon.printf("change sensorID: %d\n",senserID);
-  Serial.print("Sending: "); 
-  uint8_t res[2] = {0x4f,0x4b};
-  esp_err_t result = esp_now_send(mac_addr, res, sizeof(res));
-
   return ;
 }
 
@@ -244,20 +240,12 @@ void setup() {
     Serial.println("Waked up from nomal power on!");
     //Set device in AP mode to begin with
     WiFi.mode(WIFI_AP);
-    // configure device AP mode
     configDeviceAP();
-    // This is the mac address of the Slave in AP Mode
-    Serial.print("AP MAC: "); Serial.println(WiFi.softAPmacAddress());
-    // Init ESPNow with a fallback logic
+    // // This is the mac address of the Slave in AP Mode
+    // Serial.print("AP MAC: "); Serial.println(WiFi.softAPmacAddress());
+    // // Init ESPNow with a fallback logic
     InitESPNow();
-    // Once ESPNow is successfully Init, we will register for recv CB to
-    // get recv packer info.
     esp_now_register_recv_cb(OnDataRecv);
-
-
-
-    // Wire.begin((uint8_t)I2C_DEV_ADDR, I2C_SDA, I2C_SCL, 100000);
-    // Wire.onReceive(onReceive);
     delay(20000);
 	  WiFi.enableSTA(false);
     senserID = (EEPROM.read(0) << 8) | EEPROM.read(1); 

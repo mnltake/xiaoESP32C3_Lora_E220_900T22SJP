@@ -8,9 +8,10 @@
 #define SerialMon Serial
 // Set serial for LoRa (to the module)
 #define SerialLoRa Serial1
-// #define LTEGW 
-#define WIFIGW 
-// #define PCB
+#define LTEGW 
+// #define WIFIGW 
+#define PCB
+// #define DS18B20
 
 //I2C 
 #define I2C_DEV_ADDR 0x55
@@ -28,6 +29,7 @@
   #define I2C_SCL D5
   #define L2 D3
   #define H2 D8
+
 #else
   #define LoRa_ModeSettingPin_M0 GPIO_NUM_20//D7
   #define LoRa_ModeSettingPin_M1 GPIO_NUM_20//D7
@@ -50,7 +52,8 @@
 
 
 
-RTC_DATA_ATTR int16_t senserID = -1;
+RTC_DATA_ATTR int16_t senserID = 0;
+RTC_DATA_ATTR int16_t senserID_2nd = 0;
 RTC_DATA_ATTR uint16_t bootCount = 0;
 uint16_t waitmillsec = senserID*30 + bootCount;
 uint64_t sleepSec = 60*60;
@@ -76,10 +79,21 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
                 0b01110000, // baud_rate 115200 bps  SF:9 BW:125
                 0b11100000, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 13 dBm
                 loraChannel, //own_channel
-                0b10000111, //RSSI on ,no fix mode,wor_cycle 4000 ms
+                0b11000111, //RSSI on ,fix mode,wor_cycle 4000 ms
                 0x00, //CRYPT
                 0x00};
 #endif
+
+#ifdef DS18B20
+  #include <OneWire.h>
+  #include <DallasTemperature.h>
+  #define SENSOR_GND D5
+  #define SENSOR_3V3 D6
+  #define SENSOR_DQ D3
+  OneWire oneWire(SENSOR_DQ);
+  DallasTemperature sensors(&oneWire);
+#endif
+
 //WDT
 #include "esp_system.h"
 const int wdtTimeout = 60*1000;  //time in ms to trigger the watchdog sec
@@ -164,9 +178,13 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   Serial.println("");
   EEPROM.write(0, data[0]);  //ADDH
   EEPROM.write(1, data[1]);  //ADDL
+  EEPROM.write(2, data[2]);  //ADDH_2nd
+  EEPROM.write(3, data[3]);  //ADDL_2nd
   EEPROM.commit();
   senserID = data[0]<<8 | data[1];
+  senserID_2nd = data[2]<<8 | data[3];
   SerialMon.printf("change sensorID: %d\n",senserID);
+  SerialMon.printf("change sensorID_2nd: %d\n",senserID_2nd);
   return ;
 }
 
@@ -192,12 +210,19 @@ void getSensorID(){
     return ;
 }
 float getTemp(){
-  // digitalWrite (SENSOR_3V3 ,HIGH);
-  // delay(10);
-  // sensors.requestTemperatures(); 
-  // Serial.print("Temperature:");
-  // Serial.println(sensors.getTempCByIndex(0));
-  // return sensors.getTempCByIndex(0);
+  #ifdef  DS18B20
+    pinMode( SENSOR_GND ,OUTPUT);
+    pinMode( SENSOR_3V3 ,OUTPUT);
+    digitalWrite ( SENSOR_GND ,LOW);
+    digitalWrite (SENSOR_3V3 ,HIGH);
+    sensors.begin();
+    delay(10);
+    sensors.requestTemperatures(); 
+    Serial.print("Temperature:");
+    Serial.println(sensors.getTempCByIndex(0));
+    return sensors.getTempCByIndex(0);
+  #endif
+
   return -127;
 }
 
@@ -261,7 +286,7 @@ void setup() {
   SerialLoRa.end(); // end()を実行　←←追加
   delay(1000); // 1秒待つ　 ←←追加
   SerialLoRa.begin(LoRa_BaudRate, SERIAL_8N1, LoRa_Tx_ESP_RxPin,LoRa_Rx_ESP_TxPin);
-  EEPROM.begin(2);
+  EEPROM.begin(4);
   wakeup_cause_print();
   wakeup_reason = esp_sleep_get_wakeup_cause();
   if (ESP_SLEEP_WAKEUP_GPIO  == wakeup_reason) {
@@ -279,9 +304,11 @@ void setup() {
     gpio_hold_dis(LoRa_ModeSettingPin_M0);
     gpio_hold_dis(LoRa_ModeSettingPin_M1);
     gpio_deep_sleep_hold_dis();
+
     SwitchToConfigurationMode();//boot text clear
     SwitchToNormalMode();
     delay(100);
+
   }else{
     Serial.println("Waked up from nomal power on!");
     //Set device in AP mode to begin with
@@ -317,12 +344,9 @@ void setup() {
   Serial.println("Wake and start ");
   pinMode( L1 ,INPUT_PULLUP);
   pinMode( H1 ,INPUT_PULLUP);
+  pinMode( L2 ,INPUT_PULLUP);
+  pinMode( H2 ,INPUT_PULLUP);
 
-  #ifdef SECOND_ADDRESS
-    pinMode( L2 ,INPUT_PULLUP);
-    pinMode( H2 ,INPUT_PULLUP);
-  #endif
-  
   #ifdef LTEGW
   delay(waitmillsec);//他と重ならない秒数
   SerialMon.printf("waitmillsec: %d\n",waitmillsec);
@@ -357,16 +381,17 @@ void setup() {
   SerialLoRa.flush();
   delay(100);
 
-  #ifdef SECOND_ADDRESS
+  if (senserID_2nd){
     timerWrite(timer, 0);
-    delay(5000);
-    timerWrite(timer, 0);
-    msg.myadress = SECOND_ADDRESS;
+    delay(2000);
+    digitalWrite ( I2C_SCL,LOW);
+    pinMode( I2C_SCL ,OUTPUT);
+    msg.myadress = senserID_2nd;
     msg.temp = getTemp();
     // msg.temp = -127;
-    msg.water = digitalRead( SECOND_SW_LOW) * 49 + digitalRead( SECOND_SW_HIGH) * 51; //ここに水位
+    msg.water = digitalRead( L2 ) * 49 + digitalRead( H2 ) * 51; //ここに水位
     msg.bootcount = bootCount;
-    SerialMon.println(SECOND_ADDRESS);
+    SerialMon.println(senserID_2nd);
     SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
     SerialLoRa.flush();
     uint8_t payload2[]={msg.targetAdressH, msg.targetAdressL, msg.targetChannel ,
@@ -385,7 +410,7 @@ void setup() {
     SerialLoRa.write((uint8_t *)&payload2, sizeof(payload2));
     SerialLoRa.flush();
     delay(100);
-  #endif
+  }
 
   bootCount++;
   deep_sleep();

@@ -8,9 +8,9 @@
 #define SerialMon Serial
 // Set serial for LoRa (to the module)
 #define SerialLoRa Serial1
-#define LTEGW 
-// #define WIFIGW 
-#define PCB
+// #define LTEGW 
+#define WIFIGW 
+// #define PCB
 // #define DS18B20
 
 //I2C 
@@ -29,6 +29,9 @@
   #define I2C_SCL D5
   #define L2 D3
   #define H2 D8
+  #define ONEWIRE_GND D5
+  #define ONEWIRE_3V3 D8
+  #define ONEWIRE_DQ D3
 
 #else
   #define LoRa_ModeSettingPin_M0 GPIO_NUM_20//D7
@@ -43,6 +46,9 @@
   #define I2C_SCL D5
   #define L2 D3
   #define H2 D6
+  #define ONEWIRE_GND D5
+  #define ONEWIRE_3V3 D6
+  #define ONEWIRE_DQ D3
 #endif
 // E220-900T22S(JP)のbaud rate
 #define LoRa_BaudRate 9600
@@ -55,7 +61,7 @@
 RTC_DATA_ATTR int16_t senserID = 0;
 RTC_DATA_ATTR int16_t senserID_2nd = 0;
 RTC_DATA_ATTR uint16_t bootCount = 0;
-uint16_t waitmillsec = senserID*30 + bootCount;
+uint16_t waitmillsec = senserID*60 + bootCount;
 uint64_t sleepSec = 60*60;
 esp_sleep_source_t  wakeup_reason;
 
@@ -87,10 +93,7 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
 #ifdef DS18B20
   #include <OneWire.h>
   #include <DallasTemperature.h>
-  #define SENSOR_GND D5
-  #define SENSOR_3V3 D6
-  #define SENSOR_DQ D3
-  OneWire oneWire(SENSOR_DQ);
+  OneWire oneWire(ONEWIRE_DQ);
   DallasTemperature sensors(&oneWire);
 #endif
 
@@ -188,33 +191,12 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   return ;
 }
 
-// void onReceive(int len){
-//   byte buf[2];
-//   int j =0;
-//   while(Wire.available()){
-//     buf[j]=Wire.read();
-//     SerialMon.printf("%02x ",buf[j]);
-//     j++;
-//   }
-//     EEPROM.write(0, buf[0]);  //ADDH
-//     EEPROM.write(1, buf[1]);  //ADDL
-//     EEPROM.commit();
-//   senserID = buf[0]<<8 | buf[1];
-//   SerialMon.printf("change sensorID: %d\n",senserID);
-//   return ;
-// }
-
-void getSensorID(){
-
-
-    return ;
-}
 float getTemp(){
   #ifdef  DS18B20
-    pinMode( SENSOR_GND ,OUTPUT);
-    pinMode( SENSOR_3V3 ,OUTPUT);
-    digitalWrite ( SENSOR_GND ,LOW);
-    digitalWrite (SENSOR_3V3 ,HIGH);
+    pinMode( ONEWIRE_GND ,OUTPUT);
+    pinMode( ONEWIRE_3V3 ,OUTPUT);
+    digitalWrite ( ONEWIRE_GND ,LOW);
+    digitalWrite (ONEWIRE_3V3 ,HIGH);
     sensors.begin();
     delay(10);
     sensors.requestTemperatures(); 
@@ -245,6 +227,7 @@ void IRAM_ATTR deep_sleep(){
     Serial.println();
     Serial.println("Going to sleep now");
     delay(1000);
+    while(!digitalRead(LoRa_AUXPin)){};
     esp_deep_sleep_start();
 }
 
@@ -278,7 +261,7 @@ void setup() {
   timer = timerBegin(0, 80, true);                  //timer 0, div 80
   timerAttachInterrupt(timer, &deep_sleep, true);  //attach callback
   timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
-  timerAlarmEnable(timer);                          //enable interrupt
+  // timerAlarmEnable(timer);                          //enable interrupt
   timerWrite(timer, 0);
   SerialMon.begin(115200);
   delay(500);

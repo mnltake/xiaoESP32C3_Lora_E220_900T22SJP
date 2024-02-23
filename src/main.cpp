@@ -11,6 +11,10 @@
 // #define LTEGW 
 #define WIFIGW 
 // #define PCB
+
+//           ┌--4.7kΩ--┐
+// L1 H1 COM DQ・GND　3V3
+//  XH7pin
 // #define DS18B20
 
 //I2C 
@@ -52,12 +56,6 @@
 #endif
 // E220-900T22S(JP)のbaud rate
 #define LoRa_BaudRate 9600
-
-// #define OWN_ADDRESS 160
-// #define SECOND_ADDRESS 305
-
-
-
 RTC_DATA_ATTR int16_t senserID = 0;
 RTC_DATA_ATTR int16_t senserID_2nd = 0;
 RTC_DATA_ATTR uint16_t bootCount = 0;

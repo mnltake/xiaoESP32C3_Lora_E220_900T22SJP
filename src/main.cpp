@@ -10,7 +10,7 @@
 #define SerialLoRa Serial1
 // #define LTEGW 
 #define WIFIGW 
-// #define PCB
+#define PCB
 
 //           ┌--4.7kΩ--┐
 // L1 H1 COM DQ・GND　3V3
@@ -225,7 +225,7 @@ void IRAM_ATTR deep_sleep(){
     Serial.println();
     Serial.println("Going to sleep now");
     delay(1000);
-    while(!digitalRead(LoRa_AUXPin)){};
+    // while(!digitalRead(LoRa_AUXPin)){};
     esp_deep_sleep_start();
 }
 
@@ -303,12 +303,13 @@ void setup() {
     delay(20000);
 	  WiFi.enableSTA(false);
     senserID = (EEPROM.read(0) << 8) | EEPROM.read(1); 
+    senserID_2nd = (EEPROM.read(2) << 8) | EEPROM.read(3); 
     // senserID = OWN_ADDRESS; 
     SerialMon.printf("\n sensorID: %d\n",senserID);
     // msg.myadress =  senserID;
     
     SwitchToConfigurationMode();
-    while(!digitalRead(LoRa_AUXPin)){}
+    // while(!digitalRead(LoRa_AUXPin)){}
     SerialMon.printf("I send conf\r\n");
     for (size_t i = 0; i < sizeof(conf); i++)
     {
@@ -318,7 +319,7 @@ void setup() {
     SerialLoRa.write((uint8_t *)&conf, sizeof(conf));
 
     delay(100);
-    while(!digitalRead(LoRa_AUXPin)){}
+    // while(!digitalRead(LoRa_AUXPin)){}
     deep_sleep();
   }
 

@@ -69,7 +69,7 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
                 senserID >> 8, //ADDH
                 senserID & 0xff, //ADDL
                 0b01110000, // baud_rate 115200 bps  SF:9 BW:125
-                0b11100000, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 13 dBm
+                0b11100001, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 13 dBm
                 loraChannel, //own_channel
                 0b11000101, //RSSI on ,fix mode,wor_cycle 3000 ms
                 0x00, //CRYPT
@@ -81,7 +81,7 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
                 senserID >> 8, //ADDH
                 senserID & 0xff, //ADDL
                 0b01110000, // baud_rate 115200 bps  SF:9 BW:125
-                0b11100000, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 13 dBm
+                0b11100001, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 13 dBm
                 loraChannel, //own_channel
                 0b11000111, //RSSI on ,fix mode,wor_cycle 4000 ms
                 0x00, //CRYPT

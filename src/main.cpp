@@ -8,9 +8,10 @@
 #define SerialMon Serial
 // Set serial for LoRa (to the module)
 #define SerialLoRa Serial1
-// #define LTEGW 
-#define WIFIGW 
-#define PCB
+#define LTEGW 
+// #define WIFIGW 
+// #define PCB
+#define MINI
 
 //           ┌--4.7kΩ--┐
 // L1 H1 COM DQ・GND　3V3
@@ -37,6 +38,23 @@
   #define ONEWIRE_3V3 D8
   #define ONEWIRE_DQ D3
 
+#elif defined(MINI)
+  #define LoRa_ModeSettingPin_M0 GPIO_NUM_0
+  #define LoRa_ModeSettingPin_M1 GPIO_NUM_1
+  #define LoRa_Rx_ESP_TxPin GPIO_NUM_2
+  #define LoRa_Tx_ESP_RxPin GPIO_NUM_3
+  #define LoRa_AUXPin GPIO_NUM_4
+  #define L1 GPIO_NUM_7
+  #define H1 GPIO_NUM_6
+  #define SW_COM GPIO_NUM_8
+  #define I2C_SDA GPIO_NUM_10
+  #define I2C_SCL GPIO_NUM_20
+  #define L2 GPIO_NUM_10
+  #define H2 GPIO_NUM_21
+  #define ONEWIRE_GND GPIO_NUM_20
+  #define ONEWIRE_3V3 GPIO_NUM_21
+  #define ONEWIRE_DQ GPIO_NUM_10
+
 #else
   #define LoRa_ModeSettingPin_M0 GPIO_NUM_20//D7
   #define LoRa_ModeSettingPin_M1 GPIO_NUM_20//D7
@@ -59,7 +77,7 @@
 RTC_DATA_ATTR int16_t senserID = 0;
 RTC_DATA_ATTR int16_t senserID_2nd = 0;
 RTC_DATA_ATTR uint16_t bootCount = 0;
-uint16_t waitmillsec = senserID*60 + bootCount;
+uint16_t waitmillsec = 1000*10;//センサーごとに変える
 uint64_t sleepSec = 60*60;
 esp_sleep_source_t  wakeup_reason;
 

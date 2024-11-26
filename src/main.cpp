@@ -1,9 +1,9 @@
 #include <Arduino.h>
-// #include "Wire.h"
 #include <esp_now.h>
 #include <esp_sleep.h>
 #include <WiFi.h>
 #include <EEPROM.h>
+
 // Set serial for debug console (to the Serial Monitor)
 #define SerialMon Serial
 // Set serial for LoRa (to the module)
@@ -21,7 +21,7 @@
 //I2C 
 #define I2C_DEV_ADDR 0x55
 
-// E220-900T22S(JP)へのピンアサイン
+// ピン設定
 #ifdef PCB
   #define LoRa_ModeSettingPin_M0 GPIO_NUM_2//D0 =GPIO2
   #define LoRa_ModeSettingPin_M1 GPIO_NUM_3//D1 =GPIO3
@@ -72,8 +72,12 @@
   #define ONEWIRE_3V3 D6
   #define ONEWIRE_DQ D3
 #endif
+
+
 // E220-900T22S(JP)のbaud rate
 #define LoRa_BaudRate 9600
+#define wdtTimeout 60000
+
 RTC_DATA_ATTR int16_t senserID = 0;
 RTC_DATA_ATTR int16_t senserID_2nd = 0;
 RTC_DATA_ATTR uint16_t bootCount = 0;
@@ -86,7 +90,7 @@ uint8_t loraChannel = 0x09;
 uint8_t conf[] ={0xc0, 0x00, 0x08, 
                 senserID >> 8, //ADDH
                 senserID & 0xff, //ADDL
-                0b01110000, // baud_rate 115200 bps  SF:9 BW:125
+                0b01110000, // baud_rate 9600 bps  SF:9 BW:125
                 0b11100001, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 13 dBm
                 loraChannel, //own_channel
                 0b11000101, //RSSI on ,fix mode,wor_cycle 3000 ms
@@ -98,7 +102,7 @@ uint8_t loraChannel = 0x00;
 uint8_t conf[] ={0xc0, 0x00, 0x08, 
                 senserID >> 8, //ADDH
                 senserID & 0xff, //ADDL
-                0b01110000, // baud_rate 115200 bps  SF:9 BW:125
+                0b01110000, // baud_rate 9600 bps  SF:9 BW:125
                 0b11100001, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 13 dBm
                 loraChannel, //own_channel
                 0b11000111, //RSSI on ,fix mode,wor_cycle 4000 ms
@@ -115,12 +119,7 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
 
 //WDT
 #include "esp_system.h"
-const int wdtTimeout = 60*1000;  //time in ms to trigger the watchdog sec
 hw_timer_t *timer = NULL;
-
-
-
-
 
 struct  __attribute__((packed, aligned(4))) msgStruct{ 
   char targetAdressH = 0x00;//GateWay adress 0x0000
@@ -161,21 +160,20 @@ void SwitchToConfigurationMode(void){
 }
 
 #define CHANNEL 1
-// Init ESP Now with fallback
+// ESP-NOW初期化
 void InitESPNow() {
   WiFi.disconnect();
-  if (esp_now_init() == ESP_OK) {
-    Serial.println("ESPNow Init Success");
-  }
-  else {
-    Serial.println("ESPNow Init Failed");
-    // Retry InitESPNow, add a counte and then restart?
-    // InitESPNow();
-    // or Simply Restart
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ESPNow Init Failed. Restarting...");
     ESP.restart();
   }
 }
-
+// データ送信処理
+void SendDataToLoRa(const uint8_t *payload, size_t len) {
+  SerialLoRa.write(payload, len);
+  SerialLoRa.flush();
+  delay(100);
+}
 // config AP SSID
 void configDeviceAP() {
   const char *SSID = "Slave_1";
@@ -247,26 +245,17 @@ void IRAM_ATTR deep_sleep(){
     esp_deep_sleep_start();
 }
 
-void wakeup_cause_print() {
-  esp_sleep_wakeup_cause_t wakeup_reason;
-  wakeup_reason = esp_sleep_get_wakeup_cause();
-  switch (wakeup_reason) {
-    case 0: Serial.println("Wakeup caused by ESP_SLEEP_WAKEUP_UNDEFINED"); break;
-    case 1: Serial.println("Wakeup caused by ESP_SLEEP_WAKEUP_ALL"); break;
-    case 2: Serial.println("Wakeup caused by ESP_SLEEP_WAKEUP_EXT0"); break;
-    case 3: Serial.println("Wakeup caused by ESP_SLEEP_WAKEUP_EXT1"); break;
-    case 4: Serial.println("Wakeup caused by ESP_SLEEP_WAKEUP_TIMER"); break;
-    case 5: Serial.println("Wakeup caused by ESP_SLEEP_WAKEUP_TOUCHPAD"); break;
-    case 6: Serial.println("Wakeup caused by ESP_SLEEP_WAKEUP_ULP"); break;
-    case 7: Serial.println("Wakeup caused by ESP_SLEEP_WAKEUP_GPIO"); break;
-    case 8: Serial.println("Wakeup caused by ESP_SLEEP_WAKEUP_UART"); break;
-    case 9: Serial.println("Wakeup caused by ESP_SLEEP_WAKEUP_WIFI"); break;
-    case 10: Serial.println("Wakeup caused by ESP_SLEEP_WAKEUP_COCPU"); break;
-    case 11: Serial.println("Wakeup caused by ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG"); break;
-    case 12: Serial.println("Wakeup caused by ESP_SLEEP_WAKEUP_BT"); break;
-    default: Serial.println("Wakeup was not caused by deep sleep"); break;
-  }
+// 起床理由の確認
+void PrintWakeupReason() {
+  esp_sleep_wakeup_cause_t reason = esp_sleep_get_wakeup_cause();
+  const char *reason_str[] = {
+    "Undefined", "All", "EXT0", "EXT1", "Timer",
+    "Touchpad", "ULP", "GPIO", "UART", "WiFi",
+    "CoCPU", "CoCPU Trap", "BT"
+  };
+  Serial.printf("Wakeup reason: %s\n", reason < 13 ? reason_str[reason] : "Unknown");
 }
+
 void setup() {
   #ifndef PCB
     digitalWrite ( SW_COM ,LOW);
@@ -286,7 +275,7 @@ void setup() {
   delay(1000); // 1秒待つ　 ←←追加
   SerialLoRa.begin(LoRa_BaudRate, SERIAL_8N1, LoRa_Tx_ESP_RxPin,LoRa_Rx_ESP_TxPin);
   EEPROM.begin(4);
-  wakeup_cause_print();
+  PrintWakeupReason();
   wakeup_reason = esp_sleep_get_wakeup_cause();
   if (ESP_SLEEP_WAKEUP_GPIO  == wakeup_reason) {
     Serial.println("Waked up from external GPIO!");
@@ -377,9 +366,7 @@ void setup() {
     SerialMon.printf(" %02x",payload[i]);
   }
   SerialMon.println();
-  SerialLoRa.write((uint8_t *)&payload, sizeof(payload));
-  SerialLoRa.flush();
-  delay(100);
+  SendDataToLoRa(payload, sizeof(payload));
 
   if (senserID_2nd){
     timerWrite(timer, 0);
@@ -407,9 +394,7 @@ void setup() {
     SerialMon.printf(" %02x",payload2[i]);
     }
     SerialMon.println();
-    SerialLoRa.write((uint8_t *)&payload2, sizeof(payload2));
-    SerialLoRa.flush();
-    delay(100);
+    SendDataToLoRa(payload, sizeof(payload));
   }
 
   bootCount++;

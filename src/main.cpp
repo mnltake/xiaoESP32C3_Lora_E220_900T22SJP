@@ -82,7 +82,7 @@ RTC_DATA_ATTR int16_t senserID = 0;
 RTC_DATA_ATTR int16_t senserID_2nd = 0;
 RTC_DATA_ATTR uint16_t bootCount = 0;
 RTC_DATA_ATTR uint16_t no_water_hours = 0;
-uint16_t waitmillsec = 1000*55;//センサーごとに変える
+uint16_t waitmillsec = 1000*5;//センサーごとに変える
 uint64_t sleepSec = 20*60;
 esp_sleep_source_t  wakeup_reason;
 

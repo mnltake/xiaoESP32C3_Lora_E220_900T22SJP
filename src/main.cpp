@@ -8,10 +8,10 @@
 #define SerialMon Serial
 // Set serial for LoRa (to the module)
 #define SerialLoRa Serial1
-// #define LTEGW 
-#define WIFIGW 
+#define LTEGW 
+// #define WIFIGW 
 // #define PCB
-// #define MINI
+#define MINI
 
 //           ┌--4.7kΩ--┐
 // L1 H1 COM DQ・GND　3V3
@@ -81,6 +81,7 @@
 RTC_DATA_ATTR int16_t senserID = 0;
 RTC_DATA_ATTR int16_t senserID_2nd = 0;
 RTC_DATA_ATTR uint16_t bootCount = 0;
+RTC_DATA_ATTR uint16_t no_water_hours = 0;
 uint16_t waitmillsec = 1000*55;//センサーごとに変える
 uint64_t sleepSec = 20*60;
 esp_sleep_source_t  wakeup_reason;
@@ -129,6 +130,7 @@ struct  __attribute__((packed, aligned(4))) msgStruct{
   uint16_t water ;
   uint16_t bootcount;
   float temp  ;
+  uint16_t no_water_hours ;
 } msg;
 
 
@@ -348,8 +350,14 @@ void setup() {
   memcpy(temperatureByteData, &msg.temp, sizeof(float));
   // msg.temp = -127;
   msg.water = digitalRead( L1 ) * 49 + digitalRead( H1 ) * 51; //ここに水位
+  if (msg.water == 0){
+    no_water_hours++;
+  }else{
+    no_water_hours = 0;
+  }
   msg.bootcount = bootCount;
-  Serial.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
+  msg.no_water_hours = no_water_hours;
+  Serial.printf("boot:%d \nWater:%d \nTemp:%f \nNoWaterHours:%d\n" ,msg.bootcount,msg.water,msg.temp,msg.no_water_hours);
   SerialLoRa.flush();
 
   uint8_t payload[]={msg.targetAdressH, msg.targetAdressL, msg.targetChannel ,
@@ -358,7 +366,7 @@ void setup() {
                     msg.water &0xff, 0x00,
                     msg.bootcount & 0xff, msg.bootcount >> 8, 
                     temperatureByteData[0],temperatureByteData[1],temperatureByteData[2],temperatureByteData[3],
-                    0x00,0x00};
+                    msg.no_water_hours & 0xff, msg.no_water_hours >> 8};
   
   SerialMon.printf("I send data\r\n");
   for (size_t i = 0; i < sizeof(payload); i++)
@@ -377,16 +385,23 @@ void setup() {
     msg.temp = getTemp();
     // msg.temp = -127;
     msg.water = digitalRead( L2 ) * 49 + digitalRead( H2 ) * 51; //ここに水位
+    if (msg.water == 0){
+      no_water_hours++;
+    }else{
+      no_water_hours = 0;
+    }
     msg.bootcount = bootCount;
+    msg.no_water_hours = no_water_hours;
     SerialMon.println(senserID_2nd);
-    SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n" ,msg.bootcount,msg.water,msg.temp);
+    SerialMon.printf("boot:%d \nWater:%d \nTemp:%f\n NoWaterHours:%d\n" ,msg.bootcount,msg.water,msg.temp ,msg.no_water_hours);
     SerialLoRa.flush();
     uint8_t payload2[]={msg.targetAdressH, msg.targetAdressL, msg.targetChannel ,
 
                       msg.myadress & 0xff ,msg.myadress >> 8 ,
                       msg.water &0xff, 0x00, 
                       msg.bootcount & 0xff, msg.bootcount >> 8, 
-                      0x00, 0x00 ,0xfe, 0xc2, 0x00, 0x00};
+                      0x00, 0x00 ,0xfe, 0xc2, 
+                      msg.no_water_hours & 0xff, msg.no_water_hours >> 8};
       SerialMon.printf("I send data\n\n");
       for (size_t i = 0; i < sizeof(payload2); i++)
     {

@@ -8,11 +8,12 @@
 #define SerialMon Serial
 // Set serial for LoRa (to the module)
 #define SerialLoRa Serial1
-#define LTEGW 
-// #define WIFIGW 
+// #define LTEGW 
+#define WIFIGW 
 // #define PCB
-#define MINI
-
+// #define MINI
+#define PCBMINI
+#define E220_900T22L
 //           ┌--4.7kΩ--┐
 // L1 H1 COM DQ・GND　3V3
 //  XH7pin
@@ -55,6 +56,22 @@
   #define ONEWIRE_3V3 GPIO_NUM_21
   #define ONEWIRE_DQ GPIO_NUM_9
 
+  #elif defined(PCBMINI)
+  #define LoRa_ModeSettingPin_M0 GPIO_NUM_5
+  #define LoRa_ModeSettingPin_M1 GPIO_NUM_6
+  #define LoRa_Rx_ESP_TxPin GPIO_NUM_20
+  #define LoRa_Tx_ESP_RxPin GPIO_NUM_1
+  #define LoRa_AUXPin GPIO_NUM_7
+  #define L1 GPIO_NUM_3
+  #define H1 GPIO_NUM_4
+  #define SW_COM GPIO_NUM_8
+  #define I2C_SDA GPIO_NUM_9
+  #define I2C_SCL GPIO_NUM_10
+  #define L2 GPIO_NUM_8
+  #define H2 GPIO_NUM_2
+  #define ONEWIRE_GND GPIO_NUM_10
+  #define ONEWIRE_3V3 GPIO_NUM_2
+  #define ONEWIRE_DQ GPIO_NUM_8
 #else
   #define LoRa_ModeSettingPin_M0 GPIO_NUM_20//D7
   #define LoRa_ModeSettingPin_M1 GPIO_NUM_20//D7
@@ -86,7 +103,7 @@ uint16_t waitmillsec = 1000*5;//センサーごとに変える
 uint64_t sleepSec = 20*60;
 esp_sleep_source_t  wakeup_reason;
 
-#ifdef LTEGW
+#ifdef LTEGW 
 uint8_t loraChannel = 0x09;
 uint8_t conf[] ={0xc0, 0x00, 0x08, 
                 senserID >> 8, //ADDH
@@ -98,7 +115,8 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
                 0x00, //CRYPT
                 0x00};
 #endif
-#ifdef WIFIGW
+
+#if defined(WIFIGW) && !defined(E220_900T22L)
 uint8_t loraChannel = 0x00;
 uint8_t conf[] ={0xc0, 0x00, 0x08, 
                 senserID >> 8, //ADDH
@@ -110,6 +128,21 @@ uint8_t conf[] ={0xc0, 0x00, 0x08,
                 0x00, //CRYPT
                 0x00};
 #endif
+
+#if defined(WIFIGW) && defined(E220_900T22L)
+uint8_t loraChannel = 0x00;
+uint8_t conf[] ={0xc0, 0x00, 0x08, 
+                senserID >> 8, //ADDH
+                senserID & 0xff, //ADDL
+                0b01110000, // baud_rate 9600 bps  SF:9 BW:125
+                // 0b11100001, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 13 dBm
+                0b11101001, //subpacket_size 32, rssi_ambient_noise_flag on, transmitting_power 22 dBm
+                loraChannel, //own_channel
+                0b11000111, //RSSI on ,fix mode,wor_cycle 4000 ms
+                0x00, //CRYPT
+                0x00};
+#endif
+
 
 #ifdef DS18B20
   #include <OneWire.h>

@@ -8,12 +8,12 @@
 #define SerialMon Serial
 // Set serial for LoRa (to the module)
 #define SerialLoRa Serial1
-// #define LTEGW 
-#define WIFIGW 
+#define LTEGW 
+// #define WIFIGW 
 // #define PCB
-// #define MINI
-#define PCBMINI
-#define E220_900T22L
+#define MINI
+// #define PCBMINI
+// #define E220_900T22L
 //           ┌--4.7kΩ--┐
 // L1 H1 COM DQ・GND　3V3
 //  XH7pin
@@ -99,7 +99,8 @@ RTC_DATA_ATTR int16_t senserID = 0;
 RTC_DATA_ATTR int16_t senserID_2nd = 0;
 RTC_DATA_ATTR uint16_t bootCount = 0;
 RTC_DATA_ATTR uint16_t no_water_hours = 0;
-uint16_t waitmillsec = 1000*5;//センサーごとに変える
+uint16_t waitmillsec = 1000*35;//センサーごとに変える
+uint16_t OWN_ADDRESS = 260;
 uint64_t sleepSec = 20*60;
 esp_sleep_source_t  wakeup_reason;
 
@@ -346,7 +347,7 @@ void setup() {
 	  WiFi.enableSTA(false);
     senserID = (EEPROM.read(0) << 8) | EEPROM.read(1); 
     senserID_2nd = (EEPROM.read(2) << 8) | EEPROM.read(3); 
-    // senserID = OWN_ADDRESS; 
+    senserID = OWN_ADDRESS; 
     SerialMon.printf("\n sensorID: %d\n",senserID);
     // msg.myadress =  senserID;
     

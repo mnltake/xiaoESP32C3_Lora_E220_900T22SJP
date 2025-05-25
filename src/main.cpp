@@ -11,9 +11,9 @@
 // #define LTEGW 
 #define WIFIGW 
 // #define PCB
-// #define MINI
-#define PCBMINI
-#define E220_900T22L
+#define MINI
+// #define PCBMINI
+// #define E220_900T22L
 //           ┌--4.7kΩ--┐
 // L1 H1 COM DQ・GND　3V3
 //  XH7pin
@@ -100,7 +100,7 @@ RTC_DATA_ATTR int16_t senserID_2nd = 0;
 RTC_DATA_ATTR uint16_t bootCount = 0;
 RTC_DATA_ATTR uint16_t no_water_hours = 0;
 uint16_t waitmillsec = 1000*5;//センサーごとに変える
-uint64_t sleepSec = 20*60;
+uint64_t sleepSec = 60*60;
 esp_sleep_source_t  wakeup_reason;
 
 #ifdef LTEGW 

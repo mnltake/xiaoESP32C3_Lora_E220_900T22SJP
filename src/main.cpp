@@ -9,9 +9,10 @@
 // Set serial for LoRa (to the module)
 #define SerialLoRa Serial1
 // #define LTEGW 
+// uint16_t waitmillsec = 1000*5;//センサーごとに変える
 #define WIFIGW 
-// #define PCB
-#define MINI
+#define PCB
+// #define MINI
 // #define PCBMINI
 // #define E220_900T22L
 //           ┌--4.7kΩ--┐
@@ -99,7 +100,7 @@ RTC_DATA_ATTR int16_t senserID = 0;
 RTC_DATA_ATTR int16_t senserID_2nd = 0;
 RTC_DATA_ATTR uint16_t bootCount = 0;
 RTC_DATA_ATTR uint16_t no_water_hours = 0;
-uint16_t waitmillsec = 1000*5;//センサーごとに変える
+
 uint64_t sleepSec = 60*60;
 esp_sleep_source_t  wakeup_reason;
 

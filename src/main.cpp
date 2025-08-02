@@ -8,12 +8,13 @@
 #define SerialMon Serial
 // Set serial for LoRa (to the module)
 #define SerialLoRa Serial1
-// #define LTEGW 
-#define WIFIGW 
+#define LTEGW 
+uint16_t waitmillsec = 1000*15;//センサーごとに変える　 371:15 225:20 328:25 224:30 223:35 307:42 260:37
+// #define WIFIGW 
 // #define PCB
-// #define MINI
-#define PCBMINI
-#define E220_900T22L
+#define MINI
+// #define PCBMINI
+// #define E220_900T22L
 //           ┌--4.7kΩ--┐
 // L1 H1 COM DQ・GND　3V3
 //  XH7pin
@@ -99,8 +100,8 @@ RTC_DATA_ATTR int16_t senserID = 0;
 RTC_DATA_ATTR int16_t senserID_2nd = 0;
 RTC_DATA_ATTR uint16_t bootCount = 0;
 RTC_DATA_ATTR uint16_t no_water_hours = 0;
-uint16_t waitmillsec = 1000*5;//センサーごとに変える
-uint64_t sleepSec = 20*60;
+
+uint64_t sleepSec = 60*60;
 esp_sleep_source_t  wakeup_reason;
 
 #ifdef LTEGW 
@@ -276,6 +277,9 @@ void IRAM_ATTR deep_sleep(){
     Serial.println();
     Serial.println("Going to sleep now");
     delay(1000);
+    #ifdef LTEGW
+    delay(60000-waitmillsec);//2度起きない
+    #endif
     // while(!digitalRead(LoRa_AUXPin)){};
     esp_deep_sleep_start();
 }
@@ -345,8 +349,8 @@ void setup() {
     delay(20000);
 	  WiFi.enableSTA(false);
     senserID = (EEPROM.read(0) << 8) | EEPROM.read(1); 
-    senserID_2nd = (EEPROM.read(2) << 8) | EEPROM.read(3); 
-    // senserID = OWN_ADDRESS; 
+    // senserID_2nd = (EEPROM.read(2) << 8) | EEPROM.read(3); 
+    // senserID = 371; 
     SerialMon.printf("\n sensorID: %d\n",senserID);
     // msg.myadress =  senserID;
     
